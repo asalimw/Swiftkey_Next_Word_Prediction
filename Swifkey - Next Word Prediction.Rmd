@@ -37,11 +37,18 @@ I went to the
 
 the keyboard presents three options for what the next word might be. For example, the three words might be gym, store, restaurant. In this capstone you will work on understanding and building predictive text models like those used by SwiftKey.
 
+The first step in analyzing any new data set is figuring out: (a) what data you have and (b) what are the standard tools and models used for that type of data. This exercise uses the files named LOCALE.blogs.txt where LOCALE is the each of the four locales en_US, de_DE, ru_RU and fi_FI. The data is from a corpus called HC Corpora. The files have been language filtered but may still contain some foreign text.
 
-## Dataset
+As a first step toward working on this project is to familiarize Natural Language Processing, Text Mining, and the associated tools in R. 
+
+
+### Dataset
 This is the training data to get started that will be the basis for most of the capstone. Download the data from the link below and not from external websites to start.
 
 [Swiftkey Dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
+
+
+## Task 1: Getting and Cleaning Data
 
 ```{r downloadData}
 
@@ -103,6 +110,23 @@ rownames(raw.Info) <- c("US Blogs", "US News", "US Twitter")
 kable(raw.Info)
 ```
 
+```{r twitterQuestions}
+# In the en_US twitter data set, if you divide the number of lines where the word "love" (all lowercase) occurs by the number of lines the word "hate" (all lowercase) occurs, about what do you get?
+
+love <- sum(grepl("love", raw.Twitter, ignore.case = FALSE))
+hate <- sum(grepl("hate", raw.Twitter, ignore.case = FALSE))
+love/hate
+
+# The one tweet in the en_US twitter data set that matches the word "biostats" says what?
+raw.Twitter[grepl("biostats", raw.Twitter, ignore.case = FALSE)]
+
+
+# How many tweets have the exact characters "A computer once beat me at chess, but it was no match for me at kickboxing". (I.e. the line matches those characters exactly.)
+sum(grepl("A computer once beat me at chess, but it was no match for me at kickboxing", raw.Twitter, ignore.case = TRUE))
+```
+In the en_US twitter data set, if you divide the number of lines where the word "love" (all lowercase) occurs by the number of lines the word "hate" (all lowercase) occurs, about what do you get?
+
+
 ## References & Sources:
 Natural Language Processing Stanford Uni by Jurafsky & Manning - https://www.youtube.com/watch?v=oWsMIW-5xUc&list=PLLssT5z_DsK8HbD2sPcUIDfQ7zmBarMYv
 
@@ -113,3 +137,7 @@ Cran Task View: Natural Language Processing by Fridolin Wild - https://cran.r-pr
 Text Mining Infrastructure in R by Ingo, Kurt & David - https://www.researchgate.net/publication/26539008_Text_Mining_Infrastructure_in_R
 
 Guide to Ngram Package by Schmidt- https://cran.r-project.org/web/packages/ngram/vignettes/ngram-guide.pdf
+
+R Programming for Dummies - https://www.dummies.com/programming/r/
+
+Text Mining in R: A Tidy Approach, by Julia Silge and David Robinson - https://www.tidytextmining.com/index.html
