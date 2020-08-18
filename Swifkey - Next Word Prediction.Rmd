@@ -77,24 +77,29 @@ size <- round(file.info(c(loc.Blogs,
                           loc.News, 
                           loc.Twitter))$size/1024/1024, 2)
 
-## Number of lines in each file
+# Number of lines in each file
 lines <- c(length(raw.Blogs), 
            length(raw.News), 
            length(raw.Twitter))
 
-## Number of characters in each file
+# Number of characters in each file
 char <- c(sum(nchar(raw.Blogs)), 
           sum(nchar(raw.News)), 
           sum(nchar(raw.Twitter)))
 
-## Number of words
+# Number of words
 words <- c(wordcount(raw.Blogs, sep =" "), 
            wordcount(raw.News, sep =" "), 
            wordcount(raw.Twitter, sep =" "))
 
-raw.Info <- cbind(size, lines, char, words)
-colnames(raw.Info) <- c("File Size (MB)", "Lines", "Characters", "Words")
-rownames(raw.Info) <- c("Blogs", "News", "Twitter")
+# Longest line
+long.Line <- c(max(sapply(raw.Blogs, nchar)),
+               max(sapply(raw.News, nchar)),
+               max(sapply(raw.Twitter, nchar)))
+
+raw.Info <- cbind(size, lines, char, words, long.Line)
+colnames(raw.Info) <- c("File Size (MB)", "Lines", "Characters", "Words", "Longest Line")
+rownames(raw.Info) <- c("US Blogs", "US News", "US Twitter")
 kable(raw.Info)
 ```
 
