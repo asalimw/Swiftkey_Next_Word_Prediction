@@ -1,0 +1,110 @@
+---
+title: "Swiftkey_Next_Word_Prediction"
+author: "Willianto Asalim"
+date: "18/08/2020"
+output: html_document
+---
+
+##### The platform specification used:
+Spec    | Description
+------- | -----------------------
+OS      | Windows 10 Pro - 64 bit
+CPU     | AMD Ryzen 5 - 3400G (4 cores & 8 threads)
+RAM     | 16GB DDR4 3000MHz
+Storage | 500GB SSD - M.2 NVMe (PCIe) 
+Tool    | RStudio
+
+
+```{r LoadPackages, echo=FALSE, warning=FALSE, message=FALSE}
+library(knitr) ##Load Knitr package
+library(ggplot2) ##Plotting and data
+library(caret) ##Load package for ML
+library(dplyr) ##Data transformation package
+library(ngram) ## 
+```
+
+```{r setoptions, echo=FALSE}
+## Setting Global Option where echo = true so that someone will be able to read the code and results.
+knitr::opts_chunk$set(echo = TRUE, results = "hold", tidy = TRUE)
+```
+
+# Swiftkey - Next Word Prediction
+
+## Background
+Around the world, people are spending an increasing amount of time on their mobile devices for email, social networking, banking and a whole range of other activities. But typing on mobile devices can be a serious pain. SwiftKey, our corporate partner in this capstone, builds a smart keyboard that makes it easier for people to type on their mobile devices. One cornerstone of their smart keyboard is predictive text models. When someone types:
+
+I went to the
+
+the keyboard presents three options for what the next word might be. For example, the three words might be gym, store, restaurant. In this capstone you will work on understanding and building predictive text models like those used by SwiftKey.
+
+
+## Dataset
+This is the training data to get started that will be the basis for most of the capstone. Download the data from the link below and not from external websites to start.
+
+[Swiftkey Dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
+
+```{r downloadData}
+
+url <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+filepath <- "./data/SwiftKey.zip" 
+
+if (!file.exists("./data")) {
+  dir.create("./data")
+}
+
+if (!file.exists(filepath)){
+  download.file(url, destfile=filepath, method="curl")
+  unzip(zipfile=filepath, exdir="./data")
+}
+```
+
+
+```{r readRawData}
+# Assign English data location
+loc.Blogs <- "./data/final/en_US/en_US.blogs.txt"
+loc.News <- "./data/final/en_US/en_US.news.txt"
+loc.Twitter <- "./data/final/en_US/en_US.twitter.txt"
+
+# Read the data files
+raw.Blogs <- readLines(loc.Blogs, encoding = "UTF-8", skipNul = TRUE)
+raw.News <- readLines(loc.News, encoding = "UTF-8", skipNul = TRUE, warn = FALSE)
+raw.Twitter <- readLines(loc.Twitter, encoding = "UTF-8", skipNul = TRUE)
+```
+
+```{r checkFile}
+# Check File Size
+size <- round(file.info(c(loc.Blogs, 
+                          loc.News, 
+                          loc.Twitter))$size/1024/1024, 2)
+
+## Number of lines in each file
+lines <- c(length(raw.Blogs), 
+           length(raw.News), 
+           length(raw.Twitter))
+
+## Number of characters in each file
+char <- c(sum(nchar(raw.Blogs)), 
+          sum(nchar(raw.News)), 
+          sum(nchar(raw.Twitter)))
+
+## Number of words
+words <- c(wordcount(raw.Blogs, sep =" "), 
+           wordcount(raw.News, sep =" "), 
+           wordcount(raw.Twitter, sep =" "))
+
+raw.Info <- cbind(size, lines, char, words)
+colnames(raw.Info) <- c("File Size (MB)", "Lines", "Characters", "Words")
+rownames(raw.Info) <- c("Blogs", "News", "Twitter")
+kable(raw.Info)
+```
+
+## References & Sources:
+Natural Language Processing Stanford Uni by Jurafsky & Manning - https://www.youtube.com/watch?v=oWsMIW-5xUc&list=PLLssT5z_DsK8HbD2sPcUIDfQ7zmBarMYv
+
+Introduction to Text Analytics in R by Langer - https://www.youtube.com/playlist?list=PL8eNk_zTBST8olxIRFoo0YeXxEOkYdoxi
+
+Cran Task View: Natural Language Processing by Fridolin Wild - https://cran.r-project.org/web/views/NaturalLanguageProcessing.html
+
+Text Mining Infrastructure in R by Ingo, Kurt & David - https://www.researchgate.net/publication/26539008_Text_Mining_Infrastructure_in_R
+
+Guide to Ngram Package by Schmidt- https://cran.r-project.org/web/packages/ngram/vignettes/ngram-guide.pdf
