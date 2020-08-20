@@ -87,7 +87,6 @@ raw.Twitter <- readLines(loc.Twitter, encoding = "UTF-8", skipNul = TRUE)
 ```
 
 ```{r checkFile}
-Rprof(checking <- "./data/checking.txt")
 
 MB <- 2^20 #Byte to MB conversion
 
@@ -120,9 +119,6 @@ raw.Info <- cbind(size, lines, char, words, long.Line)
 colnames(raw.Info) <- c("File Size (MB)", "Lines", "Characters", "Words", "Longest Line")
 rownames(raw.Info) <- c("US Blogs", "US News", "US Twitter")
 kable(raw.Info)
-
-Rprof(NULL)
-summaryRprof(checking)
 ```
 
 ```{r twitterQuestions, echo = FALSE, eval=FALSE}
@@ -155,8 +151,6 @@ Given the huge scale of more than 500MB of data and It is inefficient and imprac
 
 2.1 Sampling and Tokenization
 ```{r sampling, cache=TRUE}
-Rprof(sampling <- "./data/sampling.txt") #Checking for bottleneck
-
 set.seed(1234) #Ensure the same result for reproducibilty
 
 sampleSize <- 0.1 #sample size is 10% of the population
@@ -194,15 +188,11 @@ sample.Info <- cbind(sample.Size, sample.Lines, sample.Char, sample.Words, sampl
 colnames(sample.Info) <- c("File Size (MB)", "Lines", "Characters", "Words", "Longest Line")
 rownames(sample.Info) <- c("US Blogs - Sample", "US News - Sample", "US Twitter - Sample")
 kable(sample.Info)
-
-Rprof(NULL)
-summaryRprof(sampling)
 ```
 Create tokenisation for blogs, news and Twitter using [Quanteda](https://cran.r-project.org/web/packages/quanteda/quanteda.pdf) package.
 
 ```{r tokenisation}
-Rprof(tokenising <- "./data/tokenising.txt") #Checking for bottleneck
-token.Blogs <- tokens(sample.Blogs, 
+token.Blogs <- tokens(raw.Blogs, 
                       what = "word", 
                       remove_punct = TRUE, 
                       remove_symbols = TRUE, 
@@ -211,7 +201,7 @@ token.Blogs <- tokens(sample.Blogs,
                       remove_separators = TRUE,
                       verbose = FALSE)
 
-token.News <- tokens(sample.News,
+token.News <- tokens(raw.News,
                      what = "word", 
                      remove_punct = TRUE, 
                      remove_symbols = TRUE, 
@@ -220,7 +210,7 @@ token.News <- tokens(sample.News,
                      remove_separators = TRUE,
                      verbose = FALSE)
 
-token.Twitter <- tokens(sample.Twitter,
+token.Twitter <- tokens(raw.Twitter,
                         what = "word", 
                         remove_punct = TRUE, 
                         remove_symbols = TRUE, 
@@ -231,9 +221,6 @@ token.Twitter <- tokens(sample.Twitter,
 length(token.Blogs)
 length(token.News)
 length(token.Twitter)
-
-Rprof(NULL)
-summaryRprof(tokenising)
 ```
 
 
