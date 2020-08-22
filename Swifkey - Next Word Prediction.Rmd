@@ -155,7 +155,7 @@ Given the huge scale of more than 500MB of data and It is inefficient and imprac
 
 2.1 Sampling and Tokenization
 ```{r sampling, cache=TRUE}
-Rprof(sampling <- "./data/sampling.txt") #Checking for bottleneck
+# Rprof(sampling <- "./data/sampling.txt") #Checking for bottleneck
 
 set.seed(1234) #Ensure the same result for reproducibilty
 
@@ -171,39 +171,39 @@ sample.Corpus <- corpus(c(sample.Blogs,sample.News, sample.Twitter))
 # Check size
 sample.Size <- round(c(object.size(sample.Blogs)/MB,
                        object.size(sample.News)/MB,
-                       object.size(sample.Twitter)/MB),
-                       object.size(sample.Corpus)/MB, 2)
+                       object.size(sample.Twitter)/MB), 2)
+                       
 
 # Number of lines in each file
 sample.Lines <- c(length(sample.Blogs), 
                   length(sample.News), 
-                  length(sample.Twitter),
-                  length(sample.Corpus))
+                  length(sample.Twitter))
+                  
 
 # Number of characters in each file
 sample.Char <- c(sum(nchar(sample.Blogs)), 
                  sum(nchar(sample.News)), 
-                 sum(nchar(sample.Twitter)),
-                 sum(nchar(sample.Corpus)))
+                 sum(nchar(sample.Twitter)))
+                 
 
 # Number of words
 sample.Words <- c(wordcount(sample.Blogs, sep =" "), 
                   wordcount(sample.News, sep =" "), 
-                  wordcount(sample.Twitter, sep =" "),
-                  wordcount(sample.Corpus, sep = " "))
+                  wordcount(sample.Twitter, sep =" "))
+                  
 
 # Longest line
 sample.LongLine <- c(max(sapply(sample.Blogs, nchar)),
                      max(sapply(sample.News, nchar)),
-                     max(sapply(sample.Twitter, nchar)),
-                     max(sapply(sample.Corpus, nchar)))
+                     max(sapply(sample.Twitter, nchar)))
+                     
 
-sample.Info <- cbind(sample.Size, sample.Lines, sample.Char, sample.Words, sample.LongLine, sample.Corpus)
+sample.Info <- cbind(sample.Size, sample.Lines, sample.Char, sample.Words, sample.LongLine)
 colnames(sample.Info) <- c("File Size (MB)", "Lines", "Characters", "Words", "Longest Line")
-rownames(sample.Info) <- c("US Blogs - Sample", "US News - Sample", "US Twitter - Sample", "Corpus - Sample")
+rownames(sample.Info) <- c("US Blogs - Sample", "US News - Sample", "US Twitter - Sample")
 kable(sample.Info)
 
-Rprof(NULL)
+# Rprof(NULL)
 # summaryRprof(sampling)
 ```
 
