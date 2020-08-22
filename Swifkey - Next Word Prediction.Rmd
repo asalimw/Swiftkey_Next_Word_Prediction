@@ -87,7 +87,7 @@ raw.Twitter <- readLines(loc.Twitter, encoding = "UTF-8", skipNul = TRUE)
 ```
 
 ```{r checkFile}
-Rprof(checking <- "./data/checking.txt")
+Rprof(checking <- "./data/checking.txt") #Checking for bottleneck
 
 MB <- 2^20 #Byte to MB conversion
 
@@ -122,7 +122,7 @@ rownames(raw.Info) <- c("US Blogs", "US News", "US Twitter")
 kable(raw.Info)
 
 Rprof(NULL)
-summaryRprof(checking)
+# summaryRprof(checking)
 ```
 
 ```{r twitterQuestions, echo = FALSE, eval=FALSE}
@@ -165,43 +165,77 @@ sample.Blogs <- sample(raw.Blogs, size = sampleSize*length(raw.Blogs), replace =
 sample.News <-sample(raw.News, size = sampleSize*length(raw.News), replace = FALSE)
 sample.Twitter <-sample(raw.Twitter, size = sampleSize*length(raw.Twitter), replace = FALSE)
 
+#create one corpus consists of blogs, news and twitter samples
+sample.Corpus <- corpus(c(sample.Blogs,sample.News, sample.Twitter))
+
 # Check size
 sample.Size <- round(c(object.size(sample.Blogs)/MB,
                        object.size(sample.News)/MB,
-                       object.size(sample.Twitter)/MB), 2)
+                       object.size(sample.Twitter)/MB),
+                       object.size(sample.Corpus)/MB, 2)
 
 # Number of lines in each file
 sample.Lines <- c(length(sample.Blogs), 
                   length(sample.News), 
-                  length(sample.Twitter))
+                  length(sample.Twitter),
+                  length(sample.Corpus))
 
 # Number of characters in each file
 sample.Char <- c(sum(nchar(sample.Blogs)), 
                  sum(nchar(sample.News)), 
-                 sum(nchar(sample.Twitter)))
+                 sum(nchar(sample.Twitter)),
+                 sum(nchar(sample.Corpus)))
 
 # Number of words
 sample.Words <- c(wordcount(sample.Blogs, sep =" "), 
                   wordcount(sample.News, sep =" "), 
-                  wordcount(sample.Twitter, sep =" "))
+                  wordcount(sample.Twitter, sep =" "),
+                  wordcount(sample.Corpus, sep = " "))
 
 # Longest line
 sample.LongLine <- c(max(sapply(sample.Blogs, nchar)),
                      max(sapply(sample.News, nchar)),
-                     max(sapply(sample.Twitter, nchar)))
+                     max(sapply(sample.Twitter, nchar)),
+                     max(sapply(sample.Corpus, nchar)))
 
-sample.Info <- cbind(sample.Size, sample.Lines, sample.Char, sample.Words, sample.LongLine)
+sample.Info <- cbind(sample.Size, sample.Lines, sample.Char, sample.Words, sample.LongLine, sample.Corpus)
 colnames(sample.Info) <- c("File Size (MB)", "Lines", "Characters", "Words", "Longest Line")
-rownames(sample.Info) <- c("US Blogs - Sample", "US News - Sample", "US Twitter - Sample")
+rownames(sample.Info) <- c("US Blogs - Sample", "US News - Sample", "US Twitter - Sample", "Corpus - Sample")
 kable(sample.Info)
 
 Rprof(NULL)
-summaryRprof(sampling)
+# summaryRprof(sampling)
 ```
+
+After reading in the data, we need to generate a corpus. A corpus is a type of dataset that is used in text analysis. It contains “a collection of text or speech material that has been brought together according to a certain set of predetermined criteria”
+
+Another essential component for text analysis is a data frequency matrix (DFM); also called document-term matrix (DTM). These two terms are synonyms but quanteda refers to a DFM whereas others will refer to DTM. It describes how frequently terms occur in the corpus by counting single terms.
+To generate a DFM, we first split the text into its single terms (tokens). We then count how frequently each term (token) occurs in each document.
+
+A corpus is positional (string of words) and a DFM is non-positional (bag of words). Put differently, the order of the words matters in a corpus whereas a DFM does not have information on the position of words.
+
+A token is each individual word in a text (but it could also be a sentence, paragraph, or character). This is why we call creating a “bag of words” also tokenizing text. In a nutshell, a DFM is a very efficient way of organizing the frequency of features/tokens but does not contain any information on their position. In our example, the features of a text are represented by the columns of a DFM and aggregate the frequency of each token.
+
+In most projects you want one corpus to contain all your data and generate many DFMs from that.
+
+The rows of a DFM can contain any unit on which you can aggregate documents. In the example above, we used the single documents as the unit. It may also well be more fine-grained with sub-documents or more aggregated with a larger collection of documents.
+
+```{r corpus}
+Rprof(corpus <- "./data/corpus.txt") #Checking for bottleneck
+
+sample.Corpus <- corpus(c(sample.Blogs,sample.News, sample.Twitter))
+head(sample.Corpus)
+length(sample.Corpus)
+
+Rprof(NULL)
+```
+
+
 Create tokenisation for blogs, news and Twitter using [Quanteda](https://cran.r-project.org/web/packages/quanteda/quanteda.pdf) package.
 
 ```{r tokenisation}
 Rprof(tokenising <- "./data/tokenising.txt") #Checking for bottleneck
+
 token.Blogs <- tokens(sample.Blogs, 
                       what = "word", 
                       remove_punct = TRUE, 
@@ -233,11 +267,11 @@ length(token.News)
 length(token.Twitter)
 
 Rprof(NULL)
-summaryRprof(tokenising)
+# headsummaryRprof(tokenising)
 ```
 
 
-### Appendix 
+### Appendix Code
 ```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
 ```
 
