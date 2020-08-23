@@ -165,9 +165,6 @@ sample.Blogs <- sample(raw.Blogs, size = sampleSize*length(raw.Blogs), replace =
 sample.News <-sample(raw.News, size = sampleSize*length(raw.News), replace = FALSE)
 sample.Twitter <-sample(raw.Twitter, size = sampleSize*length(raw.Twitter), replace = FALSE)
 
-#create one corpus consists of blogs, news and twitter samples
-sample.Corpus <- corpus(c(sample.Blogs,sample.News, sample.Twitter))
-
 # Check size
 sample.Size <- round(c(object.size(sample.Blogs)/MB,
                        object.size(sample.News)/MB,
@@ -207,6 +204,8 @@ kable(sample.Info)
 # summaryRprof(sampling)
 ```
 
+## Task3: Modelling
+
 After reading in the data, we need to generate a corpus. A corpus is a type of dataset that is used in text analysis. It contains “a collection of text or speech material that has been brought together according to a certain set of predetermined criteria”
 
 Another essential component for text analysis is a data frequency matrix (DFM); also called document-term matrix (DTM). These two terms are synonyms but quanteda refers to a DFM whereas others will refer to DTM. It describes how frequently terms occur in the corpus by counting single terms.
@@ -221,13 +220,20 @@ In most projects you want one corpus to contain all your data and generate many 
 The rows of a DFM can contain any unit on which you can aggregate documents. In the example above, we used the single documents as the unit. It may also well be more fine-grained with sub-documents or more aggregated with a larger collection of documents.
 
 ```{r corpus}
-Rprof(corpus <- "./data/corpus.txt") #Checking for bottleneck
+library(tm)
+library(RColorBrewer)
+#Rprof(corpus <- "./data/corpus.txt") #Checking for bottleneck
 
+
+#create one corpus consists of blogs, news and twitter samples
 sample.Corpus <- corpus(c(sample.Blogs,sample.News, sample.Twitter))
-head(sample.Corpus)
-length(sample.Corpus)
+wordcloud::wordcloud(sample.Corpus,  max.words = 100, random.order = FALSE
+          ,rot.per=0.35, use.r.layout=TRUE, colors=brewer.pal(8, "Dark2"))
 
-Rprof(NULL)
+#head(sample.Corpus)
+#length(sample.Corpus)
+
+#Rprof(NULL)
 ```
 
 
