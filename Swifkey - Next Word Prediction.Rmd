@@ -291,8 +291,6 @@ sample.TokenV1  <- tokens_remove(tokens(sample.Token, dict))
 sample.Dfm <- dfm(sample.TokenV1,
                   remove = dict)
 
-feature <- as.factor(featnames(sample.Dfm))
-
 # Top 20 features
 top20.Features <- names(topfeatures(sample.Dfm, 20))
 top20.Features
@@ -301,13 +299,12 @@ top20.Features
 total.Features <- length(as.factor(featnames(sample.Dfm)))
 total.Features
 
-feature.Frequency <- featfreq(sample.Dfm)
-feature.Frequency
 ```
 
 After tokinising and performing some text analysis, the corpus contains `r total.Features` features.
 
-```{r dfmFunc}
+```{r plot}
+
 dfm.Function <- function(corpus, n) {
         dfm(x = corpus,
             remove = dict)
@@ -317,32 +314,35 @@ ngram.Function <- function(corpus, n) {
         tokens_ngrams(corpus,
                       n = n)
 }
-```
 
 
-```{r plot}
 for (i in 1:4) {
         ## Prepare data frame for plotting
-        plot.data <- as.data.frame(
-                topfeatures(dfm.Function(ngram.Function(corpus = sample.TokenV1, n = i), 20))
-                        
-                )
+        ngram.Plot <- sample.TokenV1 %>%
+                          ngram.Function(n = i) %>%
+                          dfm.Function() %>%
+                          topfeatures(20) %>%
+                          as.data.frame()
         
-        colnames(plot.data) <- "frequency"
-      
-        plot.data$ngram <- row.names(plot.data)
+        colnames(ngram.Plot) <- "frequency"
+        ngram.Plot$ngram <- row.names(ngram.Plot)
+        
+       
+     ##   ngram.Label <- if
       
          ## Generate plots 
-        g <- ggplot(plot.data, aes(y = frequency, 
-                                   x = reorder(ngram, frequency)))
+        g <- ggplot(ngram.Plot, aes(y = frequency, 
+                                      x = reorder(ngram, frequency)))
         g <- g + geom_bar(stat = "identity") + coord_flip()
-        g <- g + ggtitle(paste(i, "-grams", sep = "")) 
+        g <- g + ggtitle(paste("Top 20 - ", i, " grams", sep = " "))
+        g <- g + geom_text(aes(label=frequency), 
+                 position = position_stack(vjust = 0.5), color="white", size=3,fontface='bold')
         g <- g + ylab("") + xlab("")
         g <- g + theme_few()
         assign(paste("p", i, sep = ""), g)
 }
 
-grid.arrange(p1, p2, p3, p4, nrow=2, ncol=2)
+grid.arrange(p1, p2, p3, p4, nrow=2, ncol=2, top ="Top 20 ngrams")
 ```
 
 
