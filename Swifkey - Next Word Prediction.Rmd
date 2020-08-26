@@ -22,6 +22,11 @@ library(caret) ##Load package for ML
 library(dplyr) ##Data transformation package
 library(quanteda)
 library(ngram) ## 
+library(tm)
+library(RColorBrewer)
+library(ggthemes)
+library(gridExtra)
+library(tidytext)
 ```
 
 ```{r setoptions, echo=FALSE}
@@ -219,62 +224,129 @@ In most projects you want one corpus to contain all your data and generate many 
 
 The rows of a DFM can contain any unit on which you can aggregate documents. In the example above, we used the single documents as the unit. It may also well be more fine-grained with sub-documents or more aggregated with a larger collection of documents.
 
+Below is the top 50 words from the blogs, news and Twitter combined into a single corpus. 
 ```{r corpus}
-library(tm)
-library(RColorBrewer)
 #Rprof(corpus <- "./data/corpus.txt") #Checking for bottleneck
 
 
 #create one corpus consists of blogs, news and twitter samples
 sample.Corpus <- corpus(c(sample.Blogs,sample.News, sample.Twitter))
-wordcloud::wordcloud(sample.Corpus,  max.words = 100, random.order = FALSE
-          ,rot.per=0.35, use.r.layout=TRUE, colors=brewer.pal(8, "Dark2"))
+wordcloud::wordcloud(sample.Corpus, max.words = 50, random.order = FALSE,
+                     rot.per=0.35, use.r.layout=TRUE, colors=brewer.pal(8, "Dark2"))
 
 #head(sample.Corpus)
 #length(sample.Corpus)
 
 #Rprof(NULL)
 ```
+The word cloud above shows that "the", "just", "like", 
+
+```{r profanity}
+
+# Download profanity file from freewebheader
+url_1 <- "https://www.cs.cmu.edu/~biglou/resources/bad-words.txt"
+filepath_1 <- "./data/profanity_words.txt" #set the location and file name of the downloaded zip file
+
+# Create directory named data for the file to download
+if (!file.exists("./data")) {
+  dir.create("./data")
+}
+
+if (!file.exists(filepath_1)){
+  download.file(url_1, destfile=filepath_1)
+}
+
+profanityWords <- readLines("./data/profanity_words.txt", encoding = "UTF-8", skipNul = TRUE)
+#dict <- dictionary(list(profanityWords))
+
+```
 
 
 Create tokenisation for blogs, news and Twitter using [Quanteda](https://cran.r-project.org/web/packages/quanteda/quanteda.pdf) package.
 
+
 ```{r tokenisation}
-Rprof(tokenising <- "./data/tokenising.txt") #Checking for bottleneck
+#Rprof(tokenising <- "./data/tokenising.txt") #Checking for bottleneck
+# Preprocess the text
 
-token.Blogs <- tokens(sample.Blogs, 
-                      what = "word", 
-                      remove_punct = TRUE, 
-                      remove_symbols = TRUE, 
-                      remove_numbers = TRUE, 
-                      remove_url = TRUE,
-                      remove_separators = TRUE,
-                      verbose = FALSE)
+# Create tokens
+sample.Token <- tokens(sample.Corpus,
+                remove_numbers = TRUE,
+                remove_punct = TRUE,
+                remove_symbols = TRUE,
+                remove_url = TRUE,
+                include_docvars = TRUE)
 
-token.News <- tokens(sample.News,
-                     what = "word", 
-                     remove_punct = TRUE, 
-                     remove_symbols = TRUE, 
-                     remove_numbers = TRUE, 
-                     remove_url = TRUE,
-                     remove_separators = TRUE,
-                     verbose = FALSE)
+# remove profanity words
+dict <- dictionary(list(badWords = profanityWords))
+sample.TokenV1  <- tokens_remove(tokens(sample.Token, dict))
 
-token.Twitter <- tokens(sample.Twitter,
-                        what = "word", 
-                        remove_punct = TRUE, 
-                        remove_symbols = TRUE, 
-                        remove_numbers = TRUE, 
-                        remove_url = TRUE,
-                        remove_separators = TRUE,
-                        verbose = FALSE)
-length(token.Blogs)
-length(token.News)
-length(token.Twitter)
 
-Rprof(NULL)
+
+#Rprof(NULL)
 # headsummaryRprof(tokenising)
 ```
+
+```{r dfm}
+sample.Dfm <- dfm(sample.TokenV1,
+                  remove = dict)
+
+feature <- as.factor(featnames(sample.Dfm))
+
+# Top 20 features
+top20.Features <- names(topfeatures(sample.Dfm, 20))
+top20.Features
+
+#Total number of feature
+total.Features <- length(as.factor(featnames(sample.Dfm)))
+total.Features
+
+feature.Frequency <- featfreq(sample.Dfm)
+feature.Frequency
+```
+
+After tokinising and performing some text analysis, the corpus contains `r total.Features` features.
+
+```{r dfmFunc}
+dfm.Function <- function(corpus, n) {
+        dfm(x = corpus,
+            remove = dict)
+}
+
+ngram.Function <- function(corpus, n) {
+        tokens_ngrams(corpus,
+                      n = n)
+}
+```
+
+
+```{r plot}
+for (i in 1:4) {
+        ## Prepare data frame for plotting
+        plot.data <- as.data.frame(
+                topfeatures(dfm.Function(ngram.Function(corpus = sample.TokenV1, n = i), 20))
+                        
+                )
+        
+        colnames(plot.data) <- "frequency"
+      
+        plot.data$ngram <- row.names(plot.data)
+      
+         ## Generate plots 
+        g <- ggplot(plot.data, aes(y = frequency, 
+                                   x = reorder(ngram, frequency)))
+        g <- g + geom_bar(stat = "identity") + coord_flip()
+        g <- g + ggtitle(paste(i, "-grams", sep = "")) 
+        g <- g + ylab("") + xlab("")
+        g <- g + theme_few()
+        assign(paste("p", i, sep = ""), g)
+}
+
+grid.arrange(p1, p2, p3, p4, nrow=2, ncol=2)
+```
+
+
+
 
 
 ### Appendix Code
@@ -294,6 +366,6 @@ Text Mining Infrastructure in R by Ingo, Kurt & David - https://www.researchgate
 
 Guide to Ngram Package by Schmidt- https://cran.r-project.org/web/packages/ngram/vignettes/ngram-guide.pdf
 
-R Programming for Dummies - https://www.dummies.com/programming/r/
-
 Text Mining in R: A Tidy Approach, by Julia Silge and David Robinson - https://www.tidytextmining.com/index.html
+
+Text Mining and Wordcloud Fundemental in R - http://www.sthda.com/english/wiki/text-mining-and-word-cloud-fundamentals-in-r-5-simple-steps-you-should-know
