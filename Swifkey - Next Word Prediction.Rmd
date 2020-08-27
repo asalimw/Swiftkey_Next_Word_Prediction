@@ -156,9 +156,12 @@ Tasks to accomplish
 
 2. Understand frequencies of words and word pairs - build figures and tables to understand variation in the frequencies of words and word pairs in the data.
 
+
+
+### 2.1 Sampling and Tokenization
+
 Given the huge scale of more than 500MB of data and It is inefficient and impractical to explore and clean all of the data. It will take a lot of computing power and time to perform all the required task to accomplish the objective. Therefore we will take a sample size from each En_US text file and combined them into a single corpora. A good maximum sample size is usually around 10% of the population, For example, in a population of 5000, 10% would be 500. In a population of 200,000, 10% would be 20,000. Therefore we will need create samples for the blogs, news and twitter dataset.
 
-2.1 Sampling and Tokenization
 ```{r sampling, cache=TRUE}
 # Rprof(sampling <- "./data/sampling.txt") #Checking for bottleneck
 
@@ -265,7 +268,8 @@ profanityWords <- readLines("./data/profanity_words.txt", encoding = "UTF-8", sk
 Create tokenisation for blogs, news and Twitter using [Quanteda](https://cran.r-project.org/web/packages/quanteda/quanteda.pdf) package.
 
 
-```{r tokenisation}
+
+```{r dfm}
 #Rprof(tokenising <- "./data/tokenising.txt") #Checking for bottleneck
 # Preprocess the text
 
@@ -283,33 +287,39 @@ sample.TokenV1  <- tokens_remove(tokens(sample.Token, dict))
 
 
 
-#Rprof(NULL)
-# headsummaryRprof(tokenising)
-```
 
-```{r dfm}
 sample.Dfm <- dfm(sample.TokenV1,
                   remove = dict)
-
+head(sample.Dfm)
 
 
 ## Word frequency
 document.Frequncy <- docfreq(sample.Dfm, scheme = "count")
-
+#document.Frequncy
 
 #Total number of feature
 total.Features <- length(as.factor(featnames(sample.Dfm)))
+total.Features
 
-# Top 20 features
+# Top 20 features using topfeature function
 top20.Features <- sample.Dfm %>%
                   topfeatures(20) %>%
                   head(20) %>%
                   data.frame()
-colnames(top20.Features) <- "Frequency"                  
-```
+#colnames(top20.Features) <- "Frequency"                  
+top20.Features
 
-After tokinising and performing some text analysis, the corpus contains `r total.Features` features and this is the top 20 most frequent words:
-`r kable(top20.Features)`.
+# Top 20 features using textstat_frequency function 
+tstat <- textstat_frequency(sample.Dfm, n = 20, ties_method = c("min"))
+tstat
+
+tstat2 <- textstat_keyness(sample.Dfm, 20)
+#tstat2
+#Rprof(NULL)
+# headsummaryRprof(tokenising)
+```
+After tokenising and analysis of the sample, the corpus contains `r total.Features` features and the top 20 words frequency:
+`r kable(tstat, caption = "Top 20 Most Frequent Words", valign = "t")`
 
 ```{r plot}
 
@@ -356,7 +366,6 @@ grid.arrange(p1, p2, p3, p4, nrow=2, ncol=2, top ="Top 20 ngrams")
 
 
 
-
 ### Appendix Code
 ```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
 ```
@@ -377,3 +386,7 @@ Guide to Ngram Package by Schmidt- https://cran.r-project.org/web/packages/ngram
 Text Mining in R: A Tidy Approach, by Julia Silge and David Robinson - https://www.tidytextmining.com/index.html
 
 Text Mining and Wordcloud Fundemental in R - http://www.sthda.com/english/wiki/text-mining-and-word-cloud-fundamentals-in-r-5-simple-steps-you-should-know
+
+textstat_frequency: Tabulate feature frequencies - https://rdrr.io/cran/quanteda/man/textstat_frequency.html
+
+Natural language processing: What would Shakespeare say? by Ganesh - https://www.r-bloggers.com/natural-language-processing-what-would-shakespeare-say/
