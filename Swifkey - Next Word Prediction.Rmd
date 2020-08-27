@@ -291,17 +291,25 @@ sample.TokenV1  <- tokens_remove(tokens(sample.Token, dict))
 sample.Dfm <- dfm(sample.TokenV1,
                   remove = dict)
 
-# Top 20 features
-top20.Features <- names(topfeatures(sample.Dfm, 20))
-top20.Features
+
+
+## Word frequency
+document.Frequncy <- docfreq(sample.Dfm, scheme = "count")
+
 
 #Total number of feature
 total.Features <- length(as.factor(featnames(sample.Dfm)))
-total.Features
 
+# Top 20 features
+top20.Features <- sample.Dfm %>%
+                  topfeatures(20) %>%
+                  head(20) %>%
+                  data.frame()
+colnames(top20.Features) <- "Frequency"                  
 ```
 
-After tokinising and performing some text analysis, the corpus contains `r total.Features` features.
+After tokinising and performing some text analysis, the corpus contains `r total.Features` features and this is the top 20 most frequent words:
+`r kable(top20.Features)`.
 
 ```{r plot}
 
