@@ -242,7 +242,7 @@ wordcloud::wordcloud(sample.Corpus, max.words = 50, random.order = FALSE,
 
 #Rprof(NULL)
 ```
-The word cloud above shows that "the", "just", "like", 
+The word cloud above shows that "the", "just", "like", "get
 
 ```{r profanity}
 
@@ -299,7 +299,7 @@ document.Frequncy <- docfreq(sample.Dfm, scheme = "count")
 
 #Total number of feature
 total.Features <- length(as.factor(featnames(sample.Dfm)))
-total.Features
+
 
 # Top 20 features using topfeature function
 top20.Features <- sample.Dfm %>%
@@ -307,22 +307,29 @@ top20.Features <- sample.Dfm %>%
                   head(20) %>%
                   data.frame()
 #colnames(top20.Features) <- "Frequency"                  
-top20.Features
+
 
 # Top 20 features using textstat_frequency function 
 tstat <- textstat_frequency(sample.Dfm, n = 20, ties_method = c("min"))
-tstat
 
-tstat2 <- textstat_keyness(sample.Dfm, 20)
-#tstat2
+
+# Top 20 Textstat_keyness
+tstat2 <- textstat_keyness(sample.Dfm,
+                           measure = c("chi2", "exact", "lr", "pmi"),
+                           sort = TRUE,
+                           20)
+
+#Token summary
+tstat3 <- textstat_summary(sample.Dfm, cache = TRUE)
+
 #Rprof(NULL)
 # headsummaryRprof(tokenising)
 ```
 After tokenising and analysis of the sample, the corpus contains `r total.Features` features and the top 20 words frequency:
 `r kable(tstat, caption = "Top 20 Most Frequent Words", valign = "t")`
 
-```{r plot}
 
+```{r function}
 dfm.Function <- function(corpus, n) {
         dfm(x = corpus,
             remove = dict)
@@ -332,7 +339,60 @@ ngram.Function <- function(corpus, n) {
         tokens_ngrams(corpus,
                       n = n)
 }
+```
 
+## 3.2 Coverage
+
+
+
+```{r coverage}
+unigram <- sample.TokenV1 %>%
+            ngram.Function(n=1) %>%
+            dfm.Function()
+            
+unigram.Frequency <- textstat_frequency(unigram)$frequency
+p<-cumsum(unigram.Frequency)/sum(unigram.Frequency)
+
+get.Coverage <- function(n = 0.5){
+                which(p >=n)[1]  
+}
+
+coverage.50 <- get.Coverage(0.5)
+coverage.90 <- get.Coverage(0.9)
+
+coverages <- seq(0.1, 0.95, 0.05)
+
+coverage.Seq <- sapply(coverages, get.Coverage)
+  
+
+cov.Df <- as.data.frame(cbind(coverages, coverage.Seq))
+          
+
+g <- ggplot(data = cov.Df, aes(y = coverages, x = coverage.Seq))
+g <- g + geom_point(size = 2, colour = "red") + geom_line(size = 1, colour = "red3")
+g <- g + geom_hline(yintercept = .5) + geom_hline(yintercept = .9)
+g <- g + scale_y_continuous(labels = scales::percent)
+g <- g + scale_x_continuous(breaks = c(coverage.50, coverage.90, get.Coverage(.95)))
+g <- g + geom_vline(xintercept = coverage.50, linetype = "dashed") + geom_vline(xintercept = coverage.90, linetype = "dashed")
+g <- g + ylab("Coverage %") + xlab("Number of words")
+g <- g + ggtitle("Word Coverage in A Corpus")
+g <- g + theme_bw()
+
+cov.Df2 <- cov.Df
+cov.Df2$coverages <- paste(cov.Df2$coverages *100, "%", sep = "")
+```
+
+The number of unique words needed to cover 50% of all word instances in the language is `r coverage.50` and the number of unique words needed to cover 90% of all words instancs in the language is `r coverage.90`.
+
+This is table that shows the number of unique words needed to cover from 50% to 95%:
+`r kable(tail(cov.Df2, n=10), col.names = c("Coverage in %", "No. of Words"), caption = "50% - 95% Unique Word Coverage", valign = "t")`
+
+The plot below shows the unique word needed to cover up to 95% of the sampled corpora:
+```{r coveragePlot, results='asis'}
+plot(g)
+```
+
+```{r ngramPlot}
 
 for (i in 1:4) {
         ## Prepare data frame for plotting
@@ -360,9 +420,28 @@ for (i in 1:4) {
         assign(paste("p", i, sep = ""), g)
 }
 
-grid.arrange(p1, p2, p3, p4, nrow=2, ncol=2, top ="Top 20 ngrams")
+##grid.arrange(p1, p2, p3, p4, nrow=2, ncol=2, top ="Top 20 ngrams")
 ```
 
+Side by Side comparison of bigram, trigram and quadgram wordcloud.
+```{r WordcloudNgram, echo = FALSE, warning=FALSE, results='asis'}
+
+par(mfrow=c(1,3))
+biCloud <- sample.TokenV1 %>%
+            ngram.Function(n=2) %>%
+            dfm.Function() %>%
+            textplot_wordcloud(max_words = 50,colors=brewer.pal(8, "Dark2"))
+
+triCloud <- sample.TokenV1 %>%
+            ngram.Function(n=3) %>%
+            dfm.Function() %>%
+            textplot_wordcloud(max_words = 50,colors=brewer.pal(8, "Dark2"))
+
+quadCloud <- sample.TokenV1 %>%
+            ngram.Function(n=4) %>%
+            dfm.Function() %>%
+            textplot_wordcloud(max_words = 50,colors=brewer.pal(8, "Dark2"))
+```
 
 
 
@@ -390,3 +469,5 @@ Text Mining and Wordcloud Fundemental in R - http://www.sthda.com/english/wiki/t
 textstat_frequency: Tabulate feature frequencies - https://rdrr.io/cran/quanteda/man/textstat_frequency.html
 
 Natural language processing: What would Shakespeare say? by Ganesh - https://www.r-bloggers.com/natural-language-processing-what-would-shakespeare-say/
+
+https://quanteda.io/reference/textstat_frequency.html
