@@ -23,6 +23,8 @@ library(markovchain)
 library(tidyr)
 library(data.table)
 library(tidyr)
+library(stringi)
+library(stringr)
 ```
 
 ```{r setoptions, echo=FALSE}
@@ -85,8 +87,10 @@ sample.Token <- tokens(sample.CorpusV2,
                 include_docvars = TRUE)
 
 # remove profanity words
-sample.TokenV1  <- tokens_remove(tokens(sample.Token, dict.Profanity))
+sample.TokenV2  <- tokens_remove(tokens(sample.Token, dict.Profanity))
 
+# save the sample token version 2 after low level cleaning
+save(sample.TokenV2, file = "./data/clean/sampleTokenV2.rda")
 ```
 From the coverage plot we also not
 
@@ -109,7 +113,7 @@ ngram.Function <- function(corpus, n) {
 ```{r ngramCreate}
 for (i in 1:4) {
         ## Create unigram, bigram, trigram and quadgram data table
-        ngram <- sample.TokenV1 %>%
+        ngram <- sample.TokenV2 %>%
                           ngram.Function(n = i)
         #assign name to the ngram ie. unigram as ngram1, bigram as gram2
         assign(paste("ngram", i, sep = ""), ngram)
@@ -117,6 +121,7 @@ for (i in 1:4) {
 
 #cleaning duplicate 
 rm(ngram)
+gc()
 ```
 
 
@@ -182,10 +187,10 @@ quadgram.Clean <- quadgram.Dt[!(quadgram.Dt$coverage>.5)]
 ## Sorted Data Table
 
 ```{r SortDataTable}
-unigram.sort <- unigram.Clean[order(-frequency, -coverage)]
-bigram.sort <- bigram.Clean[order(-frequency, -coverage)]
-trigram.sort <- trigram.Clean[order(-frequency, -coverage)]
-quadgram.sort <- quadgram.Clean[order(-frequency, -coverage)]
+unigram.sort <- unigram.Clean[order(-count, -frequency, -coverage)]
+bigram.sort <- bigram.Clean[order(-count, -frequency, -coverage)]
+trigram.sort <- trigram.Clean[order(-count, -frequency, -coverage)]
+quadgram.sort <- quadgram.Clean[order(-count, -frequency, -coverage)]
 
 ```
 
@@ -193,13 +198,14 @@ quadgram.sort <- quadgram.Clean[order(-frequency, -coverage)]
 ## Separate Words
 ```{r separateWords}
 
-biWords <- bigram.Clean %>%
+biWords <- bigram.sort %>%
             separate(ngram, c("word1", "word2"), sep = "_")
+            
 
-triWords <- trigram.Clean %>%
+triWords <- trigram.sort %>%
             separate(ngram, c("word1", "word2", "word3"), sep = "_")
 
-quadWords <- quadgram.Clean %>%
+quadWords <- quadgram.sort %>%
             separate(ngram, c("word1", "word2", "word3", "word4"), sep = "_")
 ```
 
@@ -212,53 +218,60 @@ if (!file.exists("./data/clean")) {
 save(biWords, file = "./data/clean/biWords.rda")
 save(triWords, file = "./data/clean/triWords.rda")
 save(quadWords, file = "./data/clean/quadWords.rda")
+
+#save(biWords, file = "./data/clean/biWords1.csv")
 ```
 
-Quiz 2
-DO NOT USE
-```{r quiz2}
+
+## Markov Chain Fit
+
+Using [Markov Chain](https://setosa.io/ev/markov-chains/) to predict the next word and credit to [Daniel Shiffman](https://www.youtube.com/watch?v=eGFJ8vugIWA&t=1064s) for his insight with text generator using Markov Chain.
+
+
+```{r markovChain}
 
 #' Create Ngram Matching Functions
-bigram <- function(input_words){
+bigram.Pred <- function(input_words){
                     num <- length(input_words)
                     filter(biWords, 
                           word1==input_words[num]) %>% 
-                    top_n(1, n) %>%
+                    slice_max(1, n = 5) %>%
                     filter(row_number() == 1L) %>%
                     select(num_range("word", 2)) %>%
                     as.character() -> out
                     ifelse(out =="character(0)", "?", return(out))
 }
 
-trigram <- function(input_words){
+trigram.Pred <- function(input_words){
                     num <- length(input_words)
                     filter(triWords, 
                             word1==input_words[num-1], 
                             word2==input_words[num])  %>% 
-                    top_n(1, n) %>%
+                    slice_max(1, n = 5) %>%
                     filter(row_number() == 1L) %>%
                     select(num_range("word", 3)) %>%
                     as.character() -> out
-                    ifelse(out=="character(0)", bigram(input_words), return(out))
+                    ifelse(out=="character(0)", bigram.Pred(input_words), return(out))
 }
 
-quadgram <- function(input_words){
+quadgram.Pred <- function(input_words){
                     num <- length(input_words)
                     filter(quadWords, 
                             word1==input_words[num-2], 
                             word2==input_words[num-1], 
                             word3==input_words[num])  %>% 
-                    top_n(1, n) %>%
+                    slice_max(1, n = 5) %>%
                     filter(row_number() == 1L) %>%
                     select(num_range("word", 4)) %>%
                     as.character() -> out
-                    ifelse(out=="character(0)", trigram(input_words), return(out))
+                    ifelse(out=="character(0)", trigram.Pred(input_words), return(out))
+            
 }
 
 predictWord <- function(input){
   # Create a dataframe
-  input <- data_frame(text = input)
-  # Clean the Inpput
+  input <- data.table(text = input)
+  # Clean the Input
   replace_reg <- "[^[:alpha:][:space:]]*"
   input <- input %>%
     mutate(text = str_replace_all(text, replace_reg, ""))
@@ -267,13 +280,36 @@ predictWord <- function(input){
   input_words <- unlist(str_split(input, boundary("word")))
   input_words <- tolower(input_words)
   # Call the matching functions
-  out <- ifelse(input_count == 1, bigram(input_words), 
-              ifelse (input_count == 2, trigram(input_words), quadgram(input_words)))
+  out <- ifelse(input_count == 1, bigram.Pred(input_words), 
+              ifelse (input_count == 2, trigram.Pred(input_words), quadgram.Pred(input_words)))
   # Output
   return(out)
 }
 ```
 
+```{r Quiz 3}
+q1 <- "When you breathe, I want to be the air for you. I'll be there for you, I'd live and I'd"
+q2 <- "Guy at my table's wife got up to go to the bathroom and I asked about dessert and he started telling me about his"
+q3 <- "I'd give anything to see arctic monkeys this"
+q4 <- "Talking to your mom has the same effect as a hug and helps reduce your"
+q5 <- "When you were in Holland you were like 1 inch away from me but you hadn't time to take a"
+q6 <- "I'd just like all of these questions answered, a presentation of evidence, and a jury to settle the"
+q7 <- "I can't deal with unsymetrical things. I can't even hold an uneven number of bags of groceries in each"
+q8 <- "Every inch of you is perfect from the bottom to the"
+q9 <- "I’m thankful my childhood was filled with imagination and bruises from playing"
+q10 <- "I like how the same people are in almost all of Adam Sandler's"
+
+test1 <- "the same is"
+
+```
 
 
-## Markov Chain Fit
+
+
+References:
+
+Language Models by Boyd-Graber - https://www.youtube.com/watch?v=4wa2WyDrgMA&list=PLTmbBSJTq9L6w3qvVt0k6POBWPR1Tu8Yk&index=69&t=0s
+
+decontextualize by Allison Parrish - http://www.decontextualize.com/teaching/rwet/n-grams-and-markov-chains/
+
+Web Trigrams: Visualizing Google's Tri-Gram Data by Chris Harrison - https://www.chrisharrison.net/index.php/Visualizations/WebTrigrams
