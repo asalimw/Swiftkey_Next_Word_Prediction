@@ -25,7 +25,9 @@ library(data.table)
 library(tidyr)
 library(stringi)
 library(stringr)
+library(plotly)
 ```
+
 
 ```{r setoptions, echo=FALSE}
 ## Setting Global Option where echo = true so that someone will be able to read the code and results.
@@ -34,199 +36,27 @@ knitr::opts_chunk$set(echo = FALSE, results = "hold", tidy = TRUE)
 
 ## Load Relevant Data
 ```{r loadRelevantData}
-load(file = "./data/sampleTokenV1.rda")
-load(file = "./data/sampleToken.rda")
+
+load(file = "./data/clean/uniWords.rda")
+load(file = "./data/clean/biWords.rda")
+load(file = "./data/clean/triWords.rda")
+load(file = "./data/clean/quadWords.rda")
+load(file = "./data/clean/pentaWords.rda")
+
+#load(file = "./data/sampleToken.rda")
 load(file = "./data/sampleCorpus.rda")
 ```
 
-ice that a small fraction (less than 50%) of unique words accounts for the majority of text. To improve the speed of the our model we could use unique words with less than 50% coverage. 
+## Markov Chain Fit
 
-As stated by Dan Durafsky in [Interpolation](https://www.youtube.com/watch?v=naNezonMA7k) part of NLP, the best method to use for for very large N-grams like the web would be to use the "Stupid Backoff" method. 
+Using [Markov Chain](https://setosa.io/ev/markov-chains/) to predict the next word and credit to [Daniel 
+Shiffman](https://www.youtube.com/watch?v=eGFJ8vugIWA&t=1064s) for his insight with text generator using Markov Chain.
 
 Credit to "NLP: What would Shakepeare say?" blog by [Trinviam V Ganesh](https://www.r-bloggers.com/natural-language-processing-what-would-shakespeare-say/) for the guide to implement the modelling. Our fellow member Paul Ringsted in the discussion for giving the tips and pointers on how to proceed with this.
 
+As stated by Dan Durafsky in [Interpolation](https://www.youtube.com/watch?v=naNezonMA7k) part of NLP, the best method to use for for very large N-grams like the web would be to use the "Stupid Backoff" method. 
+
 Credit to Michael Szcepaniak from the forum for providing the   [Katz Backoff Formula](https://raw.githubusercontent.com/MichaelSzczepaniak/DSSCapstoneMentor/master/kbot_complete_hand_written_example.pdf)
-
-
-
-```{r profanity}
-# Profanity word filter
-
-# Download profanity file from freewebheader
-url_1 <- "https://www.cs.cmu.edu/~biglou/resources/bad-words.txt"
-filepath_1 <- "./data/profanity_words.txt" #set the location and file name of the downloaded zip file
-
-# Create directory named data for the file to download
-if (!file.exists("./data")) {
-  dir.create("./data")
-}
-
-if (!file.exists(filepath_1)){
-  download.file(url_1, destfile=filepath_1)
-}
-
-profanityWords <- readLines("./data/profanity_words.txt", encoding = "UTF-8", skipNul = TRUE)
-dict.Profanity <- dictionary(list(badWord = profanityWords))
-
-```
-
-## Sample Data
-```{r CreateData}
-# remove the special characters that might indicate "Twitter" or other social media conventions.
-sample.CorpusV2 <- sample.Corpus %>%
-                   stri_replace_all_regex("[\\p{p}\\p{S}]", "") %>%   #remove all punctuation and symbols
-                   stri_replace_all_regex("(\\b)_(\\w+)", "$1$2") %>% #how to remove the leading _
-                  stri_replace_all_regex("\\d", "") #remove all digits
-
-# Convert to tokens
-sample.Token <- tokens(sample.CorpusV2,
-                remove_numbers = TRUE,
-                remove_punct = TRUE,
-                remove_symbols = TRUE,
-                remove_url = TRUE,
-                include_docvars = TRUE)
-
-# remove profanity words
-sample.TokenV2  <- tokens_remove(tokens(sample.Token, dict.Profanity))
-
-# save the sample token version 2 after low level cleaning
-save(sample.TokenV2, file = "./data/clean/sampleTokenV2.rda")
-```
-From the coverage plot we also not
-
-```{r function}
-# For the the purpose of text analysis, we will create two functions for dfm and ngram to apply to accomplish our task
-dfm.Function <- function(corpus, n) {
-        dfm(x = corpus,
-            remove = dict.Profanity)
-}
-
-ngram.Function <- function(corpus, n) {
-        tokens_ngrams(corpus,
-                      n = n)
-}
-```
-
-
-
-## ngram
-```{r ngramCreate}
-for (i in 1:4) {
-        ## Create unigram, bigram, trigram and quadgram data table
-        ngram <- sample.TokenV2 %>%
-                          ngram.Function(n = i)
-        #assign name to the ngram ie. unigram as ngram1, bigram as gram2
-        assign(paste("ngram", i, sep = ""), ngram)
-} 
-
-#cleaning duplicate 
-rm(ngram)
-gc()
-```
-
-
-
-##Create DMF data table (manual)
-```{r createDFM}
-dfm1 <- ngram1 %>%
-        dfm.Function()
-
-
-dfm2 <- ngram2 %>%
-        dfm.Function()
-        
-dfm3 <- ngram3 %>%
-        dfm.Function()
-
-dfm4 <- ngram4 %>%
-        dfm.Function()
-```
-
-
-
-#data table
-
-```{r dataTable}
-unigram.Dt <- data.table(ngram = featnames(dfm1), 
-                  count = colSums(dfm1), 
-                  frequency = docfreq(dfm1), 
-                  coverage = cumsum(docfreq(dfm1))/sum(docfreq(dfm1)), 
-                  key = "ngram")
-
-bigram.Dt <- data.table(ngram = featnames(dfm2), 
-                  count = colSums(dfm2), 
-                  frequency = docfreq(dfm2), 
-                  coverage = cumsum(docfreq(dfm2))/sum(docfreq(dfm2)),
-                  key = "ngram")
-
-trigram.Dt <- data.table(ngram = featnames(dfm3), 
-                  count = colSums(dfm3), 
-                  frequency = docfreq(dfm3), 
-                  coverage = cumsum(docfreq(dfm3))/sum(docfreq(dfm3)),
-                  key = "ngram")  
-
-quadgram.Dt <- data.table(ngram = featnames(dfm4), 
-                  count = colSums(dfm4), 
-                  frequency = docfreq(dfm4), 
-                  coverage = cumsum(docfreq(dfm4))/sum(docfreq(dfm4)),
-                  key = "ngram")
-```
-
-
-
-## Clean Data table
-To improve the performance of our prediction we will reduce the size to cover only word with less than 50% coverage in the data table
-```{r cleanDataTable}
-# Remove word with more than 50% coverage in the data table
-unigram.Clean <- unigram.Dt[!(unigram.Dt$coverage>.5)]
-bigram.Clean <- bigram.Dt[!(bigram.Dt$coverage>.5)]
-trigram.Clean <- trigram.Dt[!(trigram.Dt$coverage>.5)]
-quadgram.Clean <- quadgram.Dt[!(quadgram.Dt$coverage>.5)]
-```
-
-## Sorted Data Table
-
-```{r SortDataTable}
-unigram.sort <- unigram.Clean[order(-count, -frequency, -coverage)]
-bigram.sort <- bigram.Clean[order(-count, -frequency, -coverage)]
-trigram.sort <- trigram.Clean[order(-count, -frequency, -coverage)]
-quadgram.sort <- quadgram.Clean[order(-count, -frequency, -coverage)]
-
-```
-
-
-## Separate Words
-```{r separateWords}
-
-biWords <- bigram.sort %>%
-            separate(ngram, c("word1", "word2"), sep = "_")
-            
-
-triWords <- trigram.sort %>%
-            separate(ngram, c("word1", "word2", "word3"), sep = "_")
-
-quadWords <- quadgram.sort %>%
-            separate(ngram, c("word1", "word2", "word3", "word4"), sep = "_")
-```
-
-```{r SaveWords}
-
-if (!file.exists("./data/clean")) {
-  dir.create("./data/clean")
-}
-
-save(biWords, file = "./data/clean/biWords.rda")
-save(triWords, file = "./data/clean/triWords.rda")
-save(quadWords, file = "./data/clean/quadWords.rda")
-
-#save(biWords, file = "./data/clean/biWords1.csv")
-```
-
-
-## Markov Chain Fit
-
-Using [Markov Chain](https://setosa.io/ev/markov-chains/) to predict the next word and credit to [Daniel Shiffman](https://www.youtube.com/watch?v=eGFJ8vugIWA&t=1064s) for his insight with text generator using Markov Chain.
-
 
 ```{r markovChain}
 
@@ -235,8 +65,8 @@ bigram.Pred <- function(input_words){
                     num <- length(input_words)
                     filter(biWords, 
                           word1==input_words[num]) %>% 
-                    slice_max(1, n = 5) %>%
-                    filter(row_number() == 1L) %>%
+                    slice_max(5, n = 5) %>%
+                    filter(row_number() <= 1L) %>%
                     select(num_range("word", 2)) %>%
                     as.character() -> out
                     ifelse(out =="character(0)", "?", return(out))
@@ -247,8 +77,8 @@ trigram.Pred <- function(input_words){
                     filter(triWords, 
                             word1==input_words[num-1], 
                             word2==input_words[num])  %>% 
-                    slice_max(1, n = 5) %>%
-                    filter(row_number() == 1L) %>%
+                    slice_max(5, n = 5) %>%
+                    filter(row_number() <= 1L) %>%
                     select(num_range("word", 3)) %>%
                     as.character() -> out
                     ifelse(out=="character(0)", bigram.Pred(input_words), return(out))
@@ -260,32 +90,188 @@ quadgram.Pred <- function(input_words){
                             word1==input_words[num-2], 
                             word2==input_words[num-1], 
                             word3==input_words[num])  %>% 
-                    slice_max(1, n = 5) %>%
-                    filter(row_number() == 1L) %>%
+                    slice_max(5, n = 5) %>%
+                    filter(row_number() <= 1L) %>%
                     select(num_range("word", 4)) %>%
                     as.character() -> out
                     ifelse(out=="character(0)", trigram.Pred(input_words), return(out))
             
 }
 
+
+pentagram.Pred <- function(input_words){
+                    num <- length(input_words)
+                    filter(pentaWords, 
+                            word1==input_words[num-3], 
+                            word2==input_words[num-2], 
+                            word3==input_words[num-1],
+                            word4==input_words[num])  %>% 
+                    slice_max(5, n = 5) %>%
+                    filter(row_number() <= 1L) %>%
+                    select(num_range("word", 5)) %>%
+                    as.character() -> out
+                    ifelse(out=="character(0)", quadgram.Pred(input_words), return(out))
+}
+```
+
+
+```{r Backoff}
+
 predictWord <- function(input){
-  # Create a dataframe
-  input <- data.table(text = input)
+  # Create a data table
+  input <- data.frame(text = input)
+  
   # Clean the Input
   replace_reg <- "[^[:alpha:][:space:]]*"
   input <- input %>%
     mutate(text = str_replace_all(text, replace_reg, ""))
+  
+  # remove the special characters that might indicate "Twitter" or other social media conventions.
+  input <- input %>%
+              stri_replace_all_regex("[\\p{p}\\p{S}]", "") %>%   #remove all punctuation and symbols
+              stri_replace_all_regex("(\\b)_(\\w+)", "$1$2") %>% #how to remove the leading _
+              stri_replace_all_regex("\\d", "") #remove all digits
+    
   # Find word count, separate words, lower case
   input_count <- str_count(input, boundary("word"))
   input_words <- unlist(str_split(input, boundary("word")))
   input_words <- tolower(input_words)
+  
   # Call the matching functions
   out <- ifelse(input_count == 1, bigram.Pred(input_words), 
-              ifelse (input_count == 2, trigram.Pred(input_words), quadgram.Pred(input_words)))
+              ifelse (input_count == 2, trigram.Pred(input_words), 
+                      ifelse(input_count == 3, quadgram.Pred(input_words), pentagram.Pred(input_words))))
+                              
   # Output
   return(out)
 }
 ```
+
+
+```{r backoff_AltStyle}
+bigram_pred <- function(input_token, freq_matrix){
+    words_temp <- input_token
+    
+    # based on word, choose the bigram with highest frequency
+    # (since our data frame is sorted by frequency, the first one will have
+    # the highest frequency)
+    
+    nextword <- freq_matrix[word1 == input_token]
+    
+    if(length(nextword[,frequency]) == 0){
+        nextword = 0
+    }
+    # return next word
+    else{
+        nextword <- arrange(nextword, desc(frequency))
+        nextword <- nextword[, c("word2", "frequency")]
+        colnames(nextword) <- c("Prediction", "Calculated Probability")
+        nextword
+    }
+}
+
+trigram_pred <- function(input_token, freq_matrix){
+            
+        # based on word, choose the trigram with highest frequency
+        # (since our data frame is sorted by frequency, the first one will have
+        # the highest frequency)
+        
+        nextword <- freq_matrix[word1 == input_token[1] & word2 == input_token[2]
+                                ]
+        if(length(nextword[,frequency]) == 0){
+            nextword = 0
+        }
+        # return next word
+        else{
+            nextword <- arrange(nextword, desc(frequency))
+            nextword <- nextword[, c("word3", "frequency")]
+            colnames(nextword) <- c("Prediction", "Calculated Probability")
+            nextword
+        }
+}
+    
+fourgram_pred <- function(input_token, freq_matrix){
+    
+    # based on word, choose the trigram with highest frequency
+    # (since our data frame is sorted by frequency, the first one will have
+    # the highest frequency)
+    nextword <- freq_matrix[word1 == input_token[1] &
+                            word2 == input_token[2] &
+                            word3 == input_token[3]
+                            ]
+    if(length(nextword[,frequency]) == 0){
+        nextword = 0
+    }
+    # return next word
+    else{
+        nextword <- arrange(nextword, desc(frequency))
+        nextword <- nextword[, c("word4", "frequency")]
+        colnames(nextword) <- c("Prediction", "Calculated Probability")
+        nextword
+    }
+}
+
+
+
+# backoff model
+
+backoff_stop <- function(inputtext){
+    tok <- tokens(char_tolower(inputtext),
+                  remove_punct = TRUE,
+#                  remove_twitter = TRUE,
+                  remove_symbols = TRUE,
+                  remove_url = TRUE
+    )
+    
+    count <- length(tok$text1)
+    result = 0
+    
+    if(count == 0){
+        uniWords
+    }
+    else{
+        
+        if(count >= 3 || result == 0){
+            last_three <- tail(tok$text1, 3)
+            result = fourgram_pred(last_three, quadWords)
+        }
+        
+        if(count == 2 || result == 0){
+            last_two <- tail(tok$text1, 2)
+            result = trigram_pred(last_two, triWords)
+        }
+        
+        
+        if(count == 1 || result == 0){
+            last_one <- tail(tok$text1, 1)
+            result = bigram_pred(last_one, biWords)
+        }
+        
+        if(result == 0){
+            mono
+        }
+        else{
+            result
+        }
+    }
+}
+
+
+```
+
+
+```{r test}
+test1 <- "the same is"
+test2 <- "#are you sure?"
+test3 <- "%$#^&*^"
+test4 <- "&^&^ mother i am sorry"
+test5 <- "halo i am 98766 why are you &^^&^"
+test6 <- "!@#3434How am787673^%"
+test7 <- "how am"
+test8 <- "The Lord is my"
+test9 <- "Even though I walk through the valley of the shadow of"
+```
+
 
 ```{r Quiz 3}
 q1 <- "When you breathe, I want to be the air for you. I'll be there for you, I'd live and I'd"
@@ -298,9 +284,6 @@ q7 <- "I can't deal with unsymetrical things. I can't even hold an uneven number
 q8 <- "Every inch of you is perfect from the bottom to the"
 q9 <- "I’m thankful my childhood was filled with imagination and bruises from playing"
 q10 <- "I like how the same people are in almost all of Adam Sandler's"
-
-test1 <- "the same is"
-
 ```
 
 

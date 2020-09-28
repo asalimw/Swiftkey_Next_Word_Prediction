@@ -1,0 +1,551 @@
+---
+title: "Swiftkey Next Word Prediction - Ngram Data Building"
+author: "Willianto Asalim"
+date: "20/09/2020"
+output: html_document
+---
+
+
+```{r LoadPackages, echo=FALSE, warning=FALSE, message=FALSE}
+library(knitr) ##Load Knitr package
+library(ggplot2) ##Plotting and data
+library(caret) ##Load package for ML
+library(dplyr) ##Data transformation package
+library(quanteda)
+library(ngram) ## 
+library(tm)
+library(RColorBrewer)
+library(ggthemes)
+library(gridExtra)
+library(tidytext)
+library(wordcloud)
+library(markovchain)
+library(tidyr)
+library(data.table)
+library(tidyr)
+library(stringi)
+library(stringr)
+library(plotly)
+```
+
+```{r setoptions, echo=FALSE}
+## Setting Global Option where echo = true so that someone will be able to read the code and results.
+knitr::opts_chunk$set(echo = FALSE, results = "hold", tidy = TRUE)
+```
+
+## Load Relevant Data
+```{r loadRelevantData}
+#load(file = "./data/sampleTokenV1.rda")
+#load(file = "./data/sampleToken.rda")
+load(file = "./data/sampleCorpus.rda")
+```
+
+## 1. Background
+This is part 2 of the Swiftkey Next word prediction of the NLP project.
+I made some models for predicting the next word using the data and variables created during the initial Exploratory Data Analysis reporting. I realised that there are still some numbers and symbols existed after it is being cleaned using the `tokens` function from Quanteda package. The reason for this is because the numbers and symbols are attached to the words such as "9AM", "@My" and lots of hashtags. 
+
+
+## 2. How to achieve the objective?
+1. We will remove these unwanted number and symbols by performing a low level  be using the `Regex` function in the stringi/stringr package.
+2. Improve the speed and effciency of the model.I notice that a small fraction (less than 50%) of unique words accounts for the majority of text and we could use unique words with less than 50% coverage. 
+
+
+## 3. Preprocessing
+
+<br>
+
+**Please refer to the code appendix below for the detail of the code used to perform the task.**
+
+<br>
+
+First we download the profanity filter from the [CS website](https://www.cs.cmu.edu/~biglou/resources/bad-words.txt)
+```{r profanity}
+# Profanity word filter
+
+# Download profanity file from freewebheader
+url_1 <- "https://www.cs.cmu.edu/~biglou/resources/bad-words.txt"
+filepath_1 <- "./data/profanity_words.txt" #set the location and file name of the downloaded zip file
+
+# Create directory named data for the file to download
+if (!file.exists("./data")) {
+  dir.create("./data")
+}
+
+if (!file.exists(filepath_1)){
+  download.file(url_1, destfile=filepath_1)
+}
+
+profanityWords <- readLines("./data/profanity_words.txt", encoding = "UTF-8", skipNul = TRUE)
+dict.Profanity <- dictionary(list(badWord = profanityWords))
+
+```
+
+#### 3.1 Sample Data Cleaning
+
+Remove the unwanted number and symbols by performing a low level  be using the `Regex` function in the stringi/stringr package.
+```{r CreateData}
+## Sample Data Cleaning
+
+# remove the special characters that might indicate "Twitter" or other social media conventions.
+sample.CorpusV2 <- sample.Corpus %>%
+                   stri_replace_all_regex("[\\p{p}\\p{S}]", "") %>%   #remove all punctuation and symbols
+                   stri_replace_all_regex("(\\b)_(\\w+)", "$1$2") %>% #how to remove the leading _
+                   stri_replace_all_regex("\\d", "") #remove all digits
+
+
+# Remove Stop words
+stopwords_regex = paste(stopwords('en'), collapse = '\\b|\\b')
+stopwords_regex = paste0('\\b', stopwords_regex, '\\b')
+sample.CorpusV3 = stringr::str_replace_all(sample.CorpusV2, stopwords_regex, '')
+ 
+
+# Convert to tokens with stopwords
+sample.TokenV2 <- tokens(sample.CorpusV2,
+                remove_numbers = TRUE,
+                remove_punct = TRUE,
+                remove_symbols = TRUE,
+                remove_url = TRUE,
+                include_docvars = TRUE)
+
+# Convert to tokens without stopwords
+sample.TokenV3 <- tokens(sample.CorpusV3,
+                remove_numbers = TRUE,
+                remove_punct = TRUE,
+                remove_symbols = TRUE,
+                remove_url = TRUE,
+                include_docvars = TRUE)
+
+
+# remove profanity words
+sample.TokenV2  <- tokens_remove(tokens(sample.TokenV2, dict.Profanity))
+sample.TokenV3  <- tokens_remove(tokens(sample.TokenV3, dict.Profanity))
+
+
+
+# save the sample token version 2 after low level cleaning
+save(sample.TokenV2, file = "./data/clean/sampleTokenV2.rda")
+save(sample.TokenV3, file = "./data/clean/sampleTokenV3.rda")
+
+# Remove the variables no longer in use to improve efficiency.
+rm(sample.Corpus, sample.CorpusV2, sample.CorpusV3)
+```
+
+
+
+```{r function}
+# For the the purpose of text analysis, we will create two functions for dfm and ngram to apply to accomplish our task
+dfm.Function <- function(corpus, n) {
+        dfm(x = corpus,
+            remove = dict.Profanity)
+}
+
+ngram.Function <- function(corpus, n) {
+        tokens_ngrams(corpus,
+                      n = n)
+}
+```
+
+
+
+#### 3.2 ngram
+
+To view the relationship between words by using the *ngram.function* that was described earlier. This is a brief detail of the [tokens_ngrams()](https://www.rdocumentation.org/packages/quanteda/versions/2.1.1/topics/tokens_ngrams). We will use this function to create bigram, trigram, quadgram and pentagram to look a the relationship between words. In the initial Exploratory Data Analysis, they were up to quadgram(4 ngram) and to further improve accuracy, I will create a 5 ngram to do some further testing.
+
+```{r ngramCreate}
+## Forloop function to create ngram 1 - 5. One with Stopwords and the other without stopwords 
+for (i in 1:5) {
+        ## Create unigram, bigram, trigram, quadgram and pentagram data table
+        ngram <- sample.TokenV2 %>%
+                          ngram.Function(n = i)
+        #assign name to the ngram ie. unigram as ngram1, bigram as gram2
+        assign(paste("ngram", i, sep = ""), ngram)
+        
+        
+        ## Create unigram, bigram, trigram,quadgram and pentagram data table (Without Stopwords)
+        ngram <- sample.TokenV3 %>%
+                          ngram.Function(n = i)
+        #assign name to the ngram ie. unigram as ngram1, bigram as gram2
+        assign(paste("ngram.NS", i, sep = ""), ngram)
+} 
+
+#cleaning duplicate 
+rm(ngram)
+gc()
+```
+
+
+
+##Create DFM data table (manual)
+
+Data frequency matrix (DFM); also called document-term matrix (DTM). These two terms are synonyms but quanteda refers to a DFM whereas others will refer to DTM. It describes how frequently terms occur in the corpus by counting single terms.
+To generate a DFM, we first split the text into its single terms (tokens). We then count how frequently each term (token) occurs in each document.
+
+```{r createDFM}
+# DFM Data table with Stopwords
+dfm1 <- ngram1 %>%
+        dfm.Function()
+
+dfm2 <- ngram2 %>%
+        dfm.Function()
+        
+dfm3 <- ngram3 %>%
+        dfm.Function()
+
+dfm4 <- ngram4 %>%
+        dfm.Function()
+
+dfm5 <- ngram5 %>%
+        dfm.Function()
+
+
+# DFM Data table without stopwords
+dfm.NS1 <- ngram.NS1 %>%
+        dfm.Function()
+
+dfm.NS2 <- ngram.NS2 %>%
+        dfm.Function()
+        
+dfm.NS3 <- ngram.NS3 %>%
+        dfm.Function()
+
+dfm.NS4 <- ngram.NS4 %>%
+        dfm.Function()
+
+dfm.NS5 <- ngram.NS5 %>%
+        dfm.Function()
+```
+
+
+## Data Plot
+
+<center>
+**The best way to explore text data is to look at the data visually.**
+</center>
+
+<br>
+
+```{r BarchartWOStops}
+
+plot <- dfm1 %>%
+        topfeatures(30) %>%
+        as.data.frame()  
+
+plot.NS <- dfm.NS1 %>%
+            topfeatures(30) %>%
+            as.data.frame()
+
+
+# Change column name to frequency
+colnames(plot) <- "frequency"
+colnames(plot.NS) <- "frequency"
+
+# Added a column to the dataframe for plotting purpose
+plot$ngram <- row.names(plot)
+plot.NS$ngram <- row.names(plot.NS)
+
+## Generate plots for including stopwords sample data
+p <- ggplot(plot, aes(y = frequency, 
+                            x = reorder(ngram, frequency)))
+p <- p + geom_bar(stat = "identity") + coord_flip()
+p <- p + ggtitle("Top 30 Frequency of Word in the Data with Stopwords")
+p <- p + geom_text(aes(label=frequency), 
+         position = position_stack(vjust = 0.5), color="white", size=3,fontface='bold')
+p <- p + ylab("Frequency") + xlab("Word")
+p <- p + theme_few()
+
+
+## Generate plots for the no stopwords sample data
+r <- ggplot(plot.NS, aes(y = frequency, 
+                            x = reorder(ngram, frequency)))
+r <- r + geom_bar(stat = "identity") + coord_flip()
+r <- r + ggtitle("Top 30 Frequency of Word in the Data w/o Stopwords")
+r <- r + geom_text(aes(label=frequency), 
+         position = position_stack(vjust = 0.5), color="white", size=3,fontface='bold')
+r <- r + ylab("Frequency") + xlab("Word")
+r <- r + theme_few()
+
+
+
+```
+
+**Below is top 30 word frequency plot with Stop words:**
+
+```{r NSPlot2, fig.align="center", fig.cap="Figure: This is a RAW data of blogs, news and Twitter in a single corpus."}
+plot(p)
+```
+
+**Below is top 30 word frequency plot with no Stop words:**
+
+```{r NSPlot2, fig.align="center", fig.cap="Figure: This is a RAW data of blogs, news and Twitter in a single corpus."}
+plot(r)
+```
+
+#### Observation:
+
+As you can see from the the two tables after further data cleaning. Surprisingly after removing the stops words in the second plot, there are still a few stop words such as "the" and "i" but they are a lot lesser prior to cleaning.
+
+
+Side by Side comparison of bigram, trigram, quadgram and pentagram wordcloud with stopword.
+```{r WordcloudNgram, echo = FALSE, warning=FALSE, results='asis', out.width=c('30%', '35%', '35%'), fig.show='hold'}
+
+#par(mfrow=c(1,4))
+
+# Create wordcloud of bigram
+biCloud <- sample.TokenV2 %>%
+            ngram.Function(n=2) %>%
+            dfm.Function() %>%
+            textplot_wordcloud(max.words = 50, colors=brewer.pal(8, "Dark2"))
+
+# Create wordcloud of trigram
+triCloud <- sample.TokenV2 %>%
+            ngram.Function(n=3) %>%
+            dfm.Function() %>%
+            textplot_wordcloud(max.words = 35, colors=brewer.pal(8, "Dark2"))
+
+# Create wordcloud of quadgram
+quadCloud <- sample.TokenV2 %>%
+            ngram.Function(n=4) %>%
+            dfm.Function() %>%
+            textplot_wordcloud(max.words = 20, colors=brewer.pal(8, "Dark2"))
+
+pentaCloud <- sample.TokenV2 %>%
+            ngram.Function(n=5) %>%
+            dfm.Function() %>%
+            textplot_wordcloud(max.words = 15, colors=brewer.pal(8, "Dark2"))
+
+```
+
+Side by Side comparison of bigram, trigram, quadgram and pentagram wordcloud without stopword.
+```{r WordcloudNgram, echo = FALSE, warning=FALSE, results='asis', out.width=c('30%', '35%', '35%'), fig.show='hold'}
+
+#par(mfrow=c(1,4))
+
+# Create wordcloud of bigram
+biCloud <- sample.TokenV3 %>%
+            ngram.Function(n=2) %>%
+            dfm.Function() %>%
+            textplot_wordcloud(max.words = 50, colors=brewer.pal(8, "Dark2"))
+
+# Create wordcloud of trigram
+triCloud <- sample.TokenV3 %>%
+            ngram.Function(n=3) %>%
+            dfm.Function() %>%
+            textplot_wordcloud(max.words = 35, colors=brewer.pal(8, "Dark2"))
+
+# Create wordcloud of quadgram
+quadCloud <- sample.TokenV3 %>%
+            ngram.Function(n=4) %>%
+            dfm.Function() %>%
+            textplot_wordcloud(max.words = 20, colors=brewer.pal(8, "Dark2"))
+
+pentaCloud <- sample.TokenV3 %>%
+            ngram.Function(n=5) %>%
+            dfm.Function() %>%
+            textplot_wordcloud(max.words = 15, colors=brewer.pal(8, "Dark2"))
+
+```
+
+#### Observation:
+
+As you can see from the the word clouds, the corpuse with stopwords contains more variety than the corpus without stopwords. In the corpus without stopwords, the letter or word "i" dominated the whole ngrams after further data cleaning to remove stopwords. Judging from the wordclouds when the stopwords are removed does not seems to provide a better prediction. We will however use the data without stopwords to make our model for the prediction.
+
+
+## Data table
+Convert all the ngrams into data table that will consist variables such as features, count, frequency, and coverage.
+```{r dataTable}
+unigram.Dt <- data.table(ngram = featnames(dfm1), 
+                  count = colSums(dfm1), 
+                  frequency = docfreq(dfm1), 
+                  coverage = cumsum(docfreq(dfm1))/sum(docfreq(dfm1)), 
+                  key = "ngram")
+
+bigram.Dt <- data.table(ngram = featnames(dfm2), 
+                  count = colSums(dfm2), 
+                  frequency = docfreq(dfm2), 
+                  coverage = cumsum(docfreq(dfm2))/sum(docfreq(dfm2)),
+                  key = "ngram")
+
+trigram.Dt <- data.table(ngram = featnames(dfm3), 
+                  count = colSums(dfm3), 
+                  frequency = docfreq(dfm3), 
+                  coverage = cumsum(docfreq(dfm3))/sum(docfreq(dfm3)),
+                  key = "ngram")  
+
+quadgram.Dt <- data.table(ngram = featnames(dfm4), 
+                  count = colSums(dfm4), 
+                  frequency = docfreq(dfm4), 
+                  coverage = cumsum(docfreq(dfm4))/sum(docfreq(dfm4)),
+                  key = "ngram")
+
+pentagram.Dt <- data.table(ngram = featnames(dfm5), 
+                  count = colSums(dfm5), 
+                  frequency = docfreq(dfm5), 
+                  coverage = cumsum(docfreq(dfm5))/sum(docfreq(dfm5)),
+                  key = "ngram")
+
+
+# No Stopword data table
+unigram.NSDt <- data.table(ngram = featnames(dfm.NS1), 
+                  count = colSums(dfm.NS1), 
+                  frequency = docfreq(dfm.NS1), 
+                  coverage = cumsum(docfreq(dfm.NS1))/sum(docfreq(dfm.NS1)), 
+                  key = "ngram")
+
+bigram.NSDt <- data.table(ngram = featnames(dfm.NS2), 
+                  count = colSums(dfm.NS2), 
+                  frequency = docfreq(dfm.NS2), 
+                  coverage = cumsum(docfreq(dfm.NS2))/sum(docfreq(dfm.NS2)),
+                  key = "ngram")
+
+trigram.NSDt <- data.table(ngram = featnames(dfm.NS3), 
+                  count = colSums(dfm.NS3), 
+                  frequency = docfreq(dfm.NS3), 
+                  coverage = cumsum(docfreq(dfm.NS3))/sum(docfreq(dfm.NS3)),
+                  key = "ngram")  
+
+quadgram.NSDt <- data.table(ngram = featnames(dfm.NS4), 
+                  count = colSums(dfm.NS4), 
+                  frequency = docfreq(dfm.NS4), 
+                  coverage = cumsum(docfreq(dfm.NS4))/sum(docfreq(dfm.NS4)),
+                  key = "ngram")
+
+pentagram.NSDt <- data.table(ngram = featnames(dfm.NS5), 
+                  count = colSums(dfm.NS5), 
+                  frequency = docfreq(dfm.NS5), 
+                  coverage = cumsum(docfreq(dfm.NS5))/sum(docfreq(dfm.NS5)),
+                  key = "ngram")
+```
+
+
+
+## Clean Data table
+
+To improve the performance of our prediction we will reduce the size to cover only word with less than 50% coverage in the data table
+```{r cleanDataTable}
+# Remove word with more than 50% coverage in the data table
+unigram.Clean <- unigram.Dt[!(unigram.Dt$coverage>.5)]
+bigram.Clean <- bigram.Dt[!(bigram.Dt$coverage>.5)]
+trigram.Clean <- trigram.Dt[!(trigram.Dt$coverage>.5)]
+quadgram.Clean <- quadgram.Dt[!(quadgram.Dt$coverage>.5)]
+pentagram.Clean <- pentagram.Dt[!(pentagram.Dt$coverage>.5)]
+
+unigram.NSClean <- unigram.NSDt[!(unigram.NSDt$coverage>.5)]
+bigram.NSClean <- bigram.NSDt[!(bigram.NSDt$coverage>.5)]
+trigram.NSClean <- trigram.NSDt[!(trigram.NSDt$coverage>.5)]
+quadgram.NSClean <- quadgram.NSDt[!(quadgram.NSDt$coverage>.5)]
+pentagram.NSClean <- pentagram.NSDt[!(pentagram.NSDt$coverage>.5)]
+
+```
+
+## Sorted Data Table
+
+The data table of the ngram will be sorted in the descending orders of count, frequency followed by coverage.
+```{r SortDataTable}
+unigram.sort <- unigram.Clean[order(-count, -frequency, -coverage)]
+bigram.sort <- bigram.Clean[order(-count, -frequency, -coverage)]
+trigram.sort <- trigram.Clean[order(-count, -frequency, -coverage)]
+quadgram.sort <- quadgram.Clean[order(-count, -frequency, -coverage)]
+pentagram.sort <- pentagram.Clean[order(-count, -frequency, -coverage)]
+
+unigram.NSsort <- unigram.NSClean[order(-count, -frequency, -coverage)]
+bigram.NSsort <- bigram.NSClean[order(-count, -frequency, -coverage)]
+trigram.NSsort <- trigram.NSClean[order(-count, -frequency, -coverage)]
+quadgram.NSsort <- quadgram.NSClean[order(-count, -frequency, -coverage)]
+pentagram.NSsort <- pentagram.NSClean[order(-count, -frequency, -coverage)]
+```
+
+
+## Separate Words
+
+We will separate the feature names of the ngrams.
+```{r separateWords}
+uniWords <- unigram.sort %>%
+              separate(ngram, c("word1"), sep = "_")
+
+biWords <- bigram.sort %>%
+            separate(ngram, c("word1", "word2"), sep = "_")
+            
+
+triWords <- trigram.sort %>%
+            separate(ngram, c("word1", "word2", "word3"), sep = "_")
+
+quadWords <- quadgram.sort %>%
+            separate(ngram, c("word1", "word2", "word3", "word4"), sep = "_")
+
+pentaWords <- pentagram.sort %>%
+            separate(ngram, c("word1", "word2", "word3", "word4", "word5"), sep = "_")
+
+
+
+uniWords.NS <- unigram.NSsort %>%
+              separate(ngram, c("word1"), sep = "_")
+
+biWords.NS <- bigram.NSsort %>%
+            separate(ngram, c("word1", "word2"), sep = "_")
+            
+
+triWords.NS <- trigram.NSsort %>%
+            separate(ngram, c("word1", "word2", "word3"), sep = "_")
+
+quadWords.NS <- quadgram.NSsort %>%
+            separate(ngram, c("word1", "word2", "word3", "word4"), sep = "_")
+
+pentaWords.NS <- pentagram.NSsort %>%
+            separate(ngram, c("word1", "word2", "word3", "word4", "word5"), sep = "_")
+
+
+
+
+```
+
+## Variables cleaning
+Remove unused variables to speed up performance.
+```{r RemoveVariables}
+# Remove the variables no longer in use to improve efficiency.
+rm(unigram.sort, bigram.sort, trigram.sort, quadgram.sort, pentagram.sort)
+rm(unigram.NSsort, bigram.NSsort, trigram.NSsort, quadgram.NSsort, pentagram.NSsort)
+rm(unigram.Clean, bigram.Clean, trigram.Clean, quadgram.Clean, pentagram.Clean)
+rm(unigram.NSClean, bigram.NSClean, trigram.NSClean, quadgram.NSClean, pentagram.NSClean)
+rm(unigram.Dt, bigram.Dt, trigram.Dt, quadgram.Dt, pentagram.Dt)
+rm(unigram.NSDt, bigram.NSDt, trigram.NSDt, quadgram.NSDt, pentagram.NSDt)
+rm(dfm1, dfm2, dfm3, dfm4, dfm5)
+rm(dfm.NS1, dfm.NS2, dfm.NS3, dfm.NS4, dfm.NS5)
+rm(ngram1, ngram2, ngram3, ngram4, ngram5)
+rm(ngram.NS1, ngram.NS2, ngram.NS3, ngram.NS4, ngram.NS5)
+```
+
+## Save The Data.
+```{r SaveWords}
+
+if (!file.exists("./data/clean")) {
+  dir.create("./data/clean")
+}
+
+save(uniWords, file = "./data/clean/uniWords.rda")
+save(biWords, file = "./data/clean/biWords.rda")
+save(triWords, file = "./data/clean/triWords.rda")
+save(quadWords, file = "./data/clean/quadWords.rda")
+save(pentaWords, file = "./data/clean/pentaWords.rda")
+
+save(uniWords.NS, file = "./data/clean/uniWordsNS.rda")
+save(biWords.NS, file = "./data/clean/biWordsNS.rda")
+save(triWords.NS, file = "./data/clean/triWordsNS.rda")
+save(quadWords.NS, file = "./data/clean/quadWordsNS.rda")
+save(pentaWords.NS, file = "./data/clean/pentaWordsNS.rda")
+```
+
+***
+## Appendix Code
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
+
+***
+
+## The system platform specification used:
+Spec    | Description
+------- | -----------------------
+OS      | Windows 10 Pro - 64 bit
+CPU     | AMD Ryzen 5 - 3400G (4 cores & 8 threads)
+RAM     | 16GB DDR4 3000MHz
+Storage | 500GB SSD - M.2 NVMe (PCIe) 
+Tool    | RStudio

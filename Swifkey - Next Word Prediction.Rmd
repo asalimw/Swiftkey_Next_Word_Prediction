@@ -19,6 +19,8 @@ library(ggthemes)
 library(gridExtra)
 library(tidytext)
 library(wordcloud)
+library(stringi)
+library(stringr)
 ```
 
 ```{r setoptions, echo=FALSE}
@@ -28,7 +30,11 @@ knitr::opts_chunk$set(echo = FALSE, results = "hold", tidy = TRUE)
 
 # Swiftkey - Next Word Prediction Milestone Report
 
-## 1. Background
+## 1. Introduction
+
+<br>
+
+#### 1.1 Background
 
 [Natural Language Processing](https://en.wikipedia.org/wiki/Natural_language_processing) (NLP) has come a long way according to [Dan Durafsky](https://youtu.be/oWsMIW-5xUc) from Stanford. It has taken over language translation and helped in solving issues such as spam detection, part of speech tagging and named entity recognition.  However the technology for dialog, question and answering, summurisation is still really hard due to ambuiguity. 
 
@@ -38,9 +44,15 @@ I went to the ...
 
 the keyboard presents three options for what the next word might be. For example, the three words might be gym, store, restaurant. 
 
+<br>
+
+#### 1.2 Objective
+
 In this capstone we will work on understanding and building predictive text models like those used by SwiftKey.
 
-### How to achieve this objective?
+<br>
+
+### 1.3 How to achieve this objective?
 
 The first step in analyzing any new data set is figuring out: 
 
@@ -49,34 +61,48 @@ The first step in analyzing any new data set is figuring out:
 
 <br>
 
-#### Data:
+
+#### 1.3.1 Data:
 This project uses the files named LOCALE.blogs.txt where LOCALE is the each of the four locales en_US, de_DE, ru_RU and fi_FI. The data is from a corpus called HC Corpora. The files have been language filtered but may still contain some foreign text. This is the training data to get started that will be the basis for most of the capstone. Download the data from the link below and not from external websites to start.
 
 [HC Corpora Dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
 
+<br>
 
-#### Tools:
+#### 1.3.2 Tools:
 As a first step toward working on this project is to familiarize Natural Language Processing, Text Mining, and the associated tools in R. Please refer to the reference below for all the materials in regards to NLP and Text Mining. 
 
 The main development application for this project that I will be using is [RStudio](https://rstudio.com/) and the main libraries for NLP will be [TM](https://cran.r-project.org/web/packages/tm/index.html), [Quanteda](https://cran.r-project.org/web/packages/quanteda/index.html), [Wordcloud](https://cran.r-project.org/web/packages/wordcloud/index.html) and [Tidytext](https://cran.r-project.org/web/packages/tidytext/index.html).
 
 There are other libraries such as ggplot2 for plotting, caret for machine learning, dplyr for data manipulation and etc for this projects.
 
+<br>
 
-#### Modelling:
-The first step in building a predictive text mining application is to build your first simple model for the relationship between words.
+#### 1.3.3 Modelling:
+The first step in building a predictive text mining application is to build the first simple model for the relationship between words.
 
 Given the huge scale of more than 500MB of data and It is inefficient and impractical accomplish the objective as it will take a lot of computing power and time to perform all the required task. Therefore we will take a sample size from each En_US text file and combined them into a single corpora. A good maximum sample size is usually around 10% of the population, For example, in a population of 5000, 10% would be 500. In a population of 200,000, 10% would be 20,000. Therefore we will need create samples for the blogs, news and twitter dataset.
 
-Next I will build basic n-gram model - using the exploratory analysis you performed, build a basic n-gram model for predicting the next word based on the previous 1, 2, or 3 words. Then build a model to handle unseen n-grams - in some cases people will want to type a combination of words that does not appear in the corpora. Build a model to handle cases where a particular n-gram isn't observed.
+According to [R Blogger Site](https://www.r-bloggers.com/advancing-text-mining-with-r-and-quanteda/) after loading the data, we need to generate a corpus. A corpus is a type of dataset that is used in text analysis. It contains “a collection of text or speech material that has been brought together according to a certain set of predetermined criteria”. 
+
+Another essential component for text analysis is a data frequency matrix (DFM); also called document-term matrix (DTM). These two terms are synonyms but quanteda refers to a DFM whereas others will refer to DTM. It describes how frequently terms occur in the corpus by counting single terms.
+To generate a DFM, we first split the text into its single terms (tokens). We then count how frequently each term (token) occurs in each document.
+
+A corpus is positional (string of words) and a DFM is non-positional (bag of words). Put differently, the order of the words matters in a corpus whereas a DFM does not have information on the position of words.
+
+Next to understand the relationship between words, I will build basic n-gram model - using the exploratory analysis performed then build a basic n-gram model for predicting the next word based on the previous 1, 2, or 3 words. After build a model to handle unseen n-grams - in some cases people will want to type a combination of words that does not appear in the corpora.
 
 ***
 
 ## 2. Preprocessing
 
+<br>
+
 **Please refer to the code appendix below for the detail of the code used to perform the task.**
 
-#### Task 1: Gathering and Cleaning Data
+<br>
+
+#### 2.1 Gathering and Cleaning Data
 Download the data on the the directory specified and unzip the file at the same time. 
 ```{r downloadData}
 # Task 1: Getting and cleaning data
@@ -106,6 +132,8 @@ raw.Blogs <- readLines(loc.Blogs, encoding = "UTF-8", skipNul = TRUE)
 raw.News <- readLines(loc.News, encoding = "UTF-8", skipNul = TRUE, warn = FALSE)
 raw.Twitter <- readLines(loc.Twitter, encoding = "UTF-8", skipNul = TRUE)
 ```
+
+<br>
 
 Below is the information of the En_US files that we have successfully downloaded and unzip:
 ```{r checkFile}
@@ -149,29 +177,28 @@ Rprof(NULL)
 # summaryRprof(checking)
 ```
 
+<br>
+
 **From the information of the En_US data of three different sources, we could see that Blogs source contains highest number of words and it has the longest line. Twitter source has the largest data of 319MB with the shortest line whereas the News source occupied the smallest data. The wordcloud also shows that words such "the", "just", "like", etc are the most frequently used words.**
 
 ***
 
 ## 3. Exploratory Data Analysis 
 
-According to [R Blogger Site](https://www.r-bloggers.com/advancing-text-mining-with-r-and-quanteda/) after reading in the data, we need to generate a corpus. A corpus is a type of dataset that is used in text analysis. It contains “a collection of text or speech material that has been brought together according to a certain set of predetermined criteria”
-
-Another essential component for text analysis is a data frequency matrix (DFM); also called document-term matrix (DTM). These two terms are synonyms but quanteda refers to a DFM whereas others will refer to DTM. It describes how frequently terms occur in the corpus by counting single terms.
-To generate a DFM, we first split the text into its single terms (tokens). We then count how frequently each term (token) occurs in each document.
-
-A corpus is positional (string of words) and a DFM is non-positional (bag of words). Put differently, the order of the words matters in a corpus whereas a DFM does not have information on the position of words.
+As mentioned above according to [R Blogger Site](https://www.r-bloggers.com/advancing-text-mining-with-r-and-quanteda/) after loading the data, we need to generate a corpus the followed by DFM or DTM. These two terms are synonyms but quanteda refers to a DFM whereas others will refer to DTM. It describes how frequently terms occur in the corpus by counting single terms. Before generating a DFM, it is first split the text into its single terms (tokens). We then count how frequently each term (token) occurs in each document.
 
 A token is each individual word in a text (but it could also be a sentence, paragraph, or character). This is why we call creating a “bag of words” also tokenizing text. In a nutshell, a DFM is a very efficient way of organizing the frequency of features/tokens but does not contain any information on their position. In our example, the features of a text are represented by the columns of a DFM and aggregate the frequency of each token.
 
 **In most projects you want one corpus to contain all your data and generate many DFMs from that.**
 
+<br>
 
-#### We will explore the data by looking at 
+#### 3.1 We will explore the data by looking at 
 
 1. Top Words - Visualise using wordcloud and ggplot function to view the top words.
-2. Coverage - How many unique words needed in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
+2. Word Coverage - How many unique words needed in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
 
+<br>
 
 ```{r twitterQuestions, echo = FALSE, eval=FALSE}
 # The following is the analysis on Twitter
@@ -190,8 +217,9 @@ raw.Twitter[grepl("biostats", raw.Twitter, ignore.case = FALSE)]
 sum(grepl("A computer once beat me at chess, but it was no match for me at kickboxing", raw.Twitter, ignore.case = TRUE))
 ```
 
+<br>
 
-#### The top 100 words from the blogs, news and Twitter combined into a single corpus:
+#### 3.2 The top 100 words from the blogs, news and Twitter combined into a single corpus:
 ```{r rawDataCorpus}
 # Wordcloud of the raw data combined from blogs, news and Twitter
 
@@ -204,8 +232,13 @@ wordcloud::wordcloud(raw.Corpus, max.words = 100, random.order = FALSE,
 #Rprof(NULL)
 ```
 
+<br>
 
-#### Cleaning Data
+#### 3.3 Cleaning Data
+
+As I was doing some exploratory analysis of the data using grepl() function on the raw corpus data, I realised there were a lot of profanity words. There were `r sum(grepl("fuck", raw.Corpus, ignore.case = TRUE))` number of the word "fuck" related in the raw data and this is not acceptable for our text prediction. To prevent the profanity words from appearing in our prediction, we will create a list of profanity words using dictionary() function.
+
+The list of profanity word in txt format is to be downloaded from [profanity words](https://www.cs.cmu.edu/~biglou/resources/bad-words.txt)
 
 ```{r profanity}
 # Profanity word filter
@@ -227,6 +260,10 @@ profanityWords <- readLines("./data/profanity_words.txt", encoding = "UTF-8", sk
 dict.Profanity <- dictionary(list(badWord = profanityWords))
 ```
 
+As mentioned above, we want one corpus to contain all our data and generate many DFMs from that. To prevent repetitive task of creating DFMs I will create a *dfm.function* for blogs, news and Twitter using [Quanteda](https://cran.r-project.org/web/packages/quanteda/quanteda.pdf) package. I will also create a *ngram.Function* using [tokens_ngrams()](https://www.rdocumentation.org/packages/quanteda/versions/2.1.1/topics/tokens_ngrams) as we need to look at the relationship between the words such as bigram, trigram and quadgram.
+
+<br>
+
 ```{r function}
 # For the the purpose of text analysis, we will create two functions for dfm and ngram to apply to accomplish our task
 dfm.Function <- function(corpus, n) {
@@ -239,6 +276,12 @@ ngram.Function <- function(corpus, n) {
                       n = n)
 }
 ```
+
+<center>
+**The best way to explore text data is to look at the data visually.**
+</center>
+
+<br>
 
 ```{r rawPlot}
 # Create data for the plot
@@ -266,23 +309,25 @@ r <- r + ylab("Frequency") + xlab("Word")
 r <- r + theme_few()
 ```
 
-Below is top 30 word frequency plot:
+**Below is top 30 word frequency plot:**
 
-```{r rawPlot2}
+```{r rawPlot2, fig.align="center", fig.cap="Figure: This is a RAW data of blogs, news and Twitter in a single corpus."}
 plot(r)
 ```
 
 #### Initial Observation:
+
 From our initial observation of the raw corpus data plot and wordcloud, the data contains lots of [punctuations](https://www.thepunctuationguide.com/) and [stop words](https://en.wikipedia.org/wiki/Stop_word). From the Top 30 plot above we could see that periods and commas made up of the top 3 high frequencies in our data. The stop word "the" also rank second in the top 20 frequency and other stop words are also among the top 10.
 
 For the next word prediction, it will not make sense to have punctuation as the next word. Therefore we need to remove punctuations when we perfom data cleaning.
 
+<br>
 
-### 2.1 Sampling and Tokenization
+#### 3.4 Sampling and Tokenization
 
 As mentioned above, to improve efficieny due to the large dataset it would be better to work on the samples of the dataset. The sample will be 10% from the data and use set.seed() function so as to ensure reproducibility.
 
-Below is the information of the sample data of blogs, news and Twitter:
+**Below is the information of the sample data of blogs, news and Twitter:**
 ```{r sampling, cache=TRUE}
 # Rprof(sampling <- "./data/sampling.txt") #Checking for bottleneck
 
@@ -333,8 +378,11 @@ kable(sample.Info)
 # summaryRprof(sampling)
 ```
 
+<br>
+
 **Comparing between the raw and the sample data information, we can see the sample data is exactly 10% from the raw data.**
 
+<br>
 
 ```{r sampleCorpus}
 #Rprof(corpus <- "./data/corpus.txt") #Checking for bottleneck
@@ -352,6 +400,8 @@ sample.Corpus <- corpus(c(sample.Blogs,sample.News, sample.Twitter))
 #Rprof(NULL)
 ```
 
+<br>
+
 As part of the data cleaning the next word prediction, the following will be removed:
 
 - Numbers
@@ -360,7 +410,7 @@ As part of the data cleaning the next word prediction, the following will be rem
 - URL
 - Profanity
 
-The list of profanity word in txt format is to be downloaded from [profanity words](https://www.cs.cmu.edu/~biglou/resources/bad-words.txt)
+<br>
 
 ```{r dfm}
 #Rprof(tokenising <- "./data/tokenising.txt") #Checking for bottleneck
@@ -372,6 +422,7 @@ sample.Token <- tokens(sample.Corpus,
                 remove_punct = TRUE,
                 remove_symbols = TRUE,
                 remove_url = TRUE,
+              
                 include_docvars = TRUE)
 
 # remove profanity words
@@ -383,8 +434,8 @@ sample.Dfm <- dfm(sample.TokenV1,
 
 
 ## Word frequency
-document.Frequncy <- docfreq(sample.Dfm, scheme = "count")
-#document.Frequncy
+document.Frequency <- docfreq(sample.Dfm, scheme = "count")
+#document.Frequency
 
 #Total number of feature
 total.Features <- length(as.factor(featnames(sample.Dfm)))
@@ -415,16 +466,21 @@ tstat3 <- textstat_summary(sample.Dfm, cache = TRUE)
 # headsummaryRprof(tokenising)
 ```
 
+<br>
+
 **After tokenising and analysis of the sample, the corpus contains `r total.Features` features.**
 
 `r kable(tstat, caption = "The Table of Top 20 Most Frequent Words", valign = "t")`
 
+<br>
 
-#### Coverage
+#### 3.5 Word Coverage
 
-How many unique words do you need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
+**Question: How many unique words do you need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?**
 
-```{r coverage}
+To address this we will be using textstat_frequency() function to find out the word frequency. Then use the cumsum function divide by the total sum of the word frequency to find the word coverage. Credit to the members in the course discussion forums for this method.
+
+```{r wordCoverage}
 unigram <- sample.TokenV1 %>%
             ngram.Function(n=1) %>%
             dfm.Function()
@@ -467,18 +523,25 @@ This is table that shows the number of unique words needed to cover from 50% to 
 
 The plot below shows the unique word needed to cover up to 95% of the sampled corpora:
 
-```{r coveragePlot, results='asis'}
+```{r coveragePlot, results='asis', fig.align="center", fig.cap="Figure: This is a SAMPLE data of blogs, news and Twitter in a single corpus."}
 plot(g)
 ```
 
 
+#### Observation:
+We will need `r coverage.50` number of unique words needed to cover 50% of all word instances in the language and the number of unique words needed to cover 90% of all words instances in the language is `r coverage.90`.
 
-The number of unique words needed to cover 50% of all word instances in the language is `r coverage.50` and the number of unique words needed to cover 90% of all words instancs in the language is `r coverage.90`.
+From the plot we also notice that a small fraction of unique words accounts for the majority of text
+
+<br>
+
+***
 
 ## 4. Modelling
 
-Create tokenisation for blogs, news and Twitter using [Quanteda](https://cran.r-project.org/web/packages/quanteda/quanteda.pdf) package.
+Let us build the first simple model for viewing the relationship between words by using the *ngram.function* that was described earlier. This is a brief detail of the [tokens_ngrams()](https://www.rdocumentation.org/packages/quanteda/versions/2.1.1/topics/tokens_ngrams). We will use this function to create bigram, trigram and quadgram to look a the relationship between words. Then we will visually look at the the top 20 most frequenct words in the plot and word cloud.
 
+<br>
 
 ```{r ngramPlot}
 
@@ -510,19 +573,23 @@ grid.arrange(p1, p2, p3, p4, nrow=2, ncol=2, top ="Top 20 ngrams")
 ```
 
 Side by Side comparison of bigram, trigram and quadgram wordcloud.
-```{r WordcloudNgram, echo = FALSE, warning=FALSE, results='asis'}
+```{r WordcloudNgram, echo = FALSE, warning=FALSE, results='asis', out.width=c('30%', '35%', '35%'), fig.show='hold'}
 
-par(mfrow=c(1,3))
+#par(mfrow=c(1,3))
+
+# Create wordcloud of bigram
 biCloud <- sample.TokenV1 %>%
             ngram.Function(n=2) %>%
             dfm.Function() %>%
             textplot_wordcloud(max.words = 50, colors=brewer.pal(8, "Dark2"))
 
+# Create wordcloud of trigram
 triCloud <- sample.TokenV1 %>%
             ngram.Function(n=3) %>%
             dfm.Function() %>%
             textplot_wordcloud(max.words = 35, colors=brewer.pal(8, "Dark2"))
 
+# Create wordcloud of quadgram
 quadCloud <- sample.TokenV1 %>%
             ngram.Function(n=4) %>%
             dfm.Function() %>%
@@ -531,10 +598,58 @@ quadCloud <- sample.TokenV1 %>%
 ```
 
 
+***
 
+## Summary and Next Step
+
+From our initial observation of the raw corpus data plot and wordcloud, the data contains lots of [punctuations](https://www.thepunctuationguide.com/) and [stop words](https://en.wikipedia.org/wiki/Stop_word). From the Top 30 plot above we could see that periods and commas made up of the top 3 high frequencies in our data. The stop word "the" also rank second in the top 20 frequency and other stop words are also among the top 10.
+
+For the next word prediction, it will not make sense to have punctuation as the next word. Therefore we need to remove punctuations when we perfom data cleaning.
+
+We will need `r coverage.50` number of unique words needed to cover 50% of all word instances in the language and the number of unique words needed to cover 90% of all words instances in the language is `r coverage.90`.
+
+From the plot we also notice that a small fraction of unique words accounts for the majority of text.
+
+We will also need to improve the processing speed by taking a smaller sample of the raw data.
+
+### Next Plan:
+
+Markov chains can be used for very basic text generation. Think about every word in a corpus as a state. We can make a simple assumption that the next word is only dependent on the previous word - which is the basic assumption of a Markov chain.
+
+We are going to build a simple Markov chain function that creates a dictionary:
+
+1. The keys should be all of the words in the corpus
+2. The values should be a list of the words that follow the keys
+
+We will apply a Katz’s Backoff Model, whereby if a matching n-gram is not available, the model will “back off” to the next lowest (n-1)-gram. This will happen through a set of n tables, containing the corresponding list of n-grams and their frequencies.
+
+Create a Text Generator
+We're going to create a function that generates sentences. It will take two things as inputs:
+
+1. The dictionary you just created
+2. The number of words you want generated
+
+
+***
+
+## Saving Data Object
+To preserve memory so we can use only the relevant data or objects in our next step. I will save these objects as rds ext files.
+```{r saveData}
+## Raw.Corpus data
+
+save(raw.Corpus, file = "./data/rawCorpus.rda")
+save(sample.Corpus, file = "./data/sampleCorpus.rda")
+save(sample.Token, file = "./data/sampleToken.rda")
+save(sample.TokenV1, file = "./data/sampleTokenV1.rda")
+save(sample.Dfm, file = "./data/sampleDfm.rda")
+```
+
+***
 ## Appendix Code
 ```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
 ```
+
+***
 
 ## References:
 Natural Language Processing Stanford Uni by Jurafsky & Manning - https://www.youtube.com/watch?v=oWsMIW-5xUc&list=PLLssT5z_DsK8HbD2sPcUIDfQ7zmBarMYv
@@ -565,7 +680,11 @@ Natural language processing: What would Shakespeare say? by Ganesh - https://www
 
 Natural Language processing in Python by Zhao - https://youtu.be/xvqsFTUsOmc
 
-##### The system platform specification used:
+How to Generate Word Clouds in R by Van den Rul - https://towardsdatascience.com/create-a-word-cloud-with-r-bde3e7422e8a
+
+***
+
+## The system platform specification used:
 Spec    | Description
 ------- | -----------------------
 OS      | Windows 10 Pro - 64 bit
